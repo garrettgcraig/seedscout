@@ -442,24 +442,88 @@ function timeline(t, today){
   return `<div class="tl">${s}</div>`;
 }
 
-/* ---------- data ---------- */
-async function load(){
-  MODEL = await (await fetch('species_socal.json')).json();
-  assignFamilyHues(MODEL.taxa);
-  for (const t of MODEL.taxa){
+/* ---------- tiled data ----------
+   The model is cut into tiles so a national build never ships as one payload.
+   The client loads only the tiles its search circle touches, and a species is
+   fitted separately in each tile, because phenology varies across a region far
+   more than a single pooled window can express. */
+const TILE_ROOT = 'tiles_socal';
+let TILE_INDEX = null, TAXA = [];
+const TILE_CACHE = new Map();
+const tileName = (r, c) => `${r}_${c}`;
+
+function tilesFor(lat, lng, km){
+  const D = TILE_INDEX.tile_deg;
+  // Distance below is already measured to the nearest point of the tile, so the
+  // pad is just the search radius. Adding a tile width on top would pull in
+  // every neighbour and, at national scale, most of the country.
+  const pad = km / 111 + 0.02;
+  const out = [];
+  for (const t of TILE_INDEX.tiles){
+    const [r, c] = t.tile;
+    const [s, w, n, e] = [r*D, c*D, (r+1)*D, (c+1)*D];
+    // Nearest point of the tile to the query, in degrees; cheap and generous.
+    const dLat = Math.max(s - lat, 0, lat - n);
+    const dLng = Math.max(w - lng, 0, lng - e);
+    if (Math.hypot(dLat, dLng * Math.cos(lat*Math.PI/180)) <= pad) out.push(t);
+  }
+  return out;
+}
+
+async function ensureTiles(lat, lng, km){
+  if (!TILE_INDEX) return;
+  const want = tilesFor(lat, lng, km);
+  await Promise.all(want.map(async t => {
+    const key = tileName(...t.tile);
+    if (TILE_CACHE.has(key)) return;
+    try {
+      TILE_CACHE.set(key, await (await fetch(`${TILE_ROOT}/${t.file}`)).json());
+    } catch { TILE_CACHE.set(key, {taxa: []}); }
+  }));
+
+  // A species can appear in several loaded tiles with different windows. Prefer
+  // the tile the query point sits in, then the most local fit, then the largest
+  // local sample.
+  const D = TILE_INDEX.tile_deg;
+  const home = tileName(Math.floor(lat/D), Math.floor(lng/D));
+  const rank = {cell: 0, block: 1, region: 2};
+  const best = new Map();
+  for (const t of want){
+    const key = tileName(...t.tile);
+    const isHome = key === home;
+    for (const sp of (TILE_CACHE.get(key)?.taxa || [])){
+      const prev = best.get(sp.taxon_id);
+      const better = !prev
+        || (isHome && !prev._home)
+        || (isHome === prev._home && rank[sp.fit_level] < rank[prev.fit_level])
+        || (isHome === prev._home && sp.fit_level === prev.fit_level && sp.n_local > prev.n_local);
+      if (better) best.set(sp.taxon_id, Object.assign(sp, {_home: isHome}));
+    }
+  }
+
+  TAXA = [...best.values()];
+  BY_ID.clear(); INDEX.clear();
+  for (const t of TAXA){
     BY_ID.set(t.taxon_id, t);
     for (const [cell, n] of Object.entries(t.cells)){
       if (!INDEX.has(cell)) INDEX.set(cell, []);
       INDEX.get(cell).push({t, n});
     }
   }
-  $('sub').innerHTML = `${MODEL.taxa.length} species modelled from iNaturalist observations ·
-    ${MODEL.region.toUpperCase()} · built ${MODEL.generated}`;
-  $('taxalist').innerHTML = MODEL.taxa
+  assignFamilyHues(TAXA);
+  $('taxalist').innerHTML = TAXA
     .map(t => `<option value="${esc(t.name)}">${esc(t.common || '')}</option>`).join('');
+  $('sub').innerHTML = `${TAXA.length} species near this point · ${want.length} tile${
+    want.length === 1 ? '' : 's'} loaded · ${TILE_INDEX.region.toUpperCase()} ·
+    built ${TILE_INDEX.generated}`;
+}
+
+async function load(){
+  TILE_INDEX = await (await fetch(`${TILE_ROOT}/index.json`)).json();
+  MODEL = TILE_INDEX;
   $('date').value = $('r-date').value = new Date().toISOString().slice(0,10);
   initMap();
-  refreshPosition();
+  await refreshPosition();
   renderLog();
 }
 
@@ -524,9 +588,10 @@ function setPosition(lat, lng, zoom){
 }
 
 // Called on every pin move: cheap work now, the elevation request debounced.
-function refreshPosition(){
+async function refreshPosition(){
   $('coordtext').textContent =
     `${POS.lat.toFixed(4)}, ${POS.lng.toFixed(4)}`.replace(/-/g, '−');
+  await ensureTiles(POS.lat, POS.lng, +$('radius').value);
   run();
   clearTimeout(ELEV_TIMER);
   ELEV_TIMER = setTimeout(lookupElevation, 350);
@@ -592,6 +657,10 @@ function card(t, local, c, today){
   if (t.confidence < 0.5) tags.push(['warn', `low confidence · n=${t.n_fruit}`]);
   if (t.persistence > 0.3) tags.push(['warn', 'fruit persists — may read late']);
   if (t.method === 'doy_fallback') tags.push(['warn', 'no flowering data']);
+  // How local the window actually is. A fit borrowed from a wider area can miss
+  // a climate gradient, which is exactly how a pooled model goes wrong.
+  if (t.fit_level === 'block') tags.push(['grey', 'fitted from surrounding area']);
+  if (t.fit_level === 'region') tags.push(['warn', 'region-wide fit — not local']);
   if (t.ripe_window_days > WIDE_WINDOW)
     tags.push(['warn', `${t.ripe_window_days} d window — too vague to time`]);
 
@@ -657,7 +726,7 @@ function renderSearch(query, totals, today){
                : 2;
     return {t, rank};
   };
-  const matches = MODEL.taxa.map(hit).filter(Boolean)
+  const matches = TAXA.map(hit).filter(Boolean)
     .sort((a, b) => a.rank - b.rank || b.t.n_fruit - a.t.n_fruit)
     .slice(0, 30);
 
@@ -682,7 +751,7 @@ function renderSearch(query, totals, today){
 }
 
 function run(){
-  if (!MODEL) return;
+  if (!TILE_INDEX) return;
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';
@@ -1207,7 +1276,7 @@ function setRecPos(lat, lng){
 $('r-save').onclick = () => {
   const species = $('r-species').value.trim();
   if (!species) return alert('Which species?');
-  const match = MODEL.taxa.find(t => t.name.toLowerCase() === species.toLowerCase()
+  const match = TAXA.find(t => t.name.toLowerCase() === species.toLowerCase()
                                   || (t.common || '').toLowerCase() === species.toLowerCase());
   const rec = {
     id: Date.now().toString(36),
@@ -1336,9 +1405,10 @@ $('search').addEventListener('input', () => {
   clearTimeout(SEARCH_TIMER);
   SEARCH_TIMER = setTimeout(run, 160);
 });
-$('radius').onchange = () => {
+$('radius').onchange = async () => {
   if (RING) RING.setRadius(+$('radius').value * 1000);
   fitRing();
+  await ensureTiles(POS.lat, POS.lng, +$('radius').value);
   run();
 };
 $('locate').onclick = () => {

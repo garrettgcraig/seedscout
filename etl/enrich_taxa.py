@@ -189,6 +189,19 @@ def enrich(model_path: Path, bbox: dict) -> None:
 
     payload["enriched"] = True
     model_path.write_text(json.dumps(payload, separators=(",", ":")))
+
+    # Per-taxon metadata is independent of geography, so it is also written on
+    # its own for build_tiles.py to merge into every tile a species appears in.
+    # That keeps enrichment a once-per-species cost rather than once per tile.
+    meta_path = model_path.parent / f"taxa_meta_{payload['region']}.json"
+    meta_path.write_text(json.dumps({
+        str(t["taxon_id"]): {
+            k: t[k] for k in ("family", "sensitive", "status_codes", "establishment", "tips", "photos")
+            if k in t
+        }
+        for t in taxa
+    }, separators=(",", ":")))
+    print(f"  taxon metadata -> {meta_path.name}")
     counts = {k: sum(1 for t in taxa if t["establishment"] == k) for k in ("native", "introduced")}
     print(
         f"done: {n_sensitive} sensitive flagged, {counts} (rest ambiguous), "

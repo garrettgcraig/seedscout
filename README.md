@@ -25,17 +25,32 @@ as the 20th–55th percentile of that distribution, with the peak at the 35th.
 Species with too few flowering records fall back to a day-of-year fit and are marked
 `doy_fallback`, which carries a confidence penalty.
 
-Two quantities are kept separate:
+## Fits are local, with a stated fallback
 
-- **Phenology is regional.** Per-cell sample sizes are far too thin to fit a season, so the window
-  is pooled across the region.
-- **Occurrence is local.** Each species carries the ~25 km grid cells where it has been recorded
-  fruiting, plus the 10th–90th percentile elevation band of those records.
+Phenology varies across a region far more than one pooled window can express. *Larrea tridentata*
+peaks in June in the Mojave and September in the southern deserts; a single fit for coastal Southern
+California reports late June and is wrong for everything south of it.
 
-The client combines them at query time: what grows near you, crossed with what is ripe now.
+So space is cut into 2° tiles and each species is fitted separately inside each one. The tension is
+sample size — a tile small enough to be climatically coherent is often too small to fit a season —
+so every (species, tile) takes the finest fit its data supports:
+
+| level | fitted from | share (SoCal) |
+|---|---|---|
+| `cell` | the tile itself | 26% |
+| `block` | the tile plus its eight neighbours | 64% |
+| `region` | everything in the dataset | 10% |
+
+Anything coarser than `cell` carries a confidence penalty and is labelled on the card, so a window
+borrowed from a wider area never passes as a local one.
+
+Occurrence stays finer still: each species carries the ~25 km grid cells where it has been recorded
+fruiting, plus the 10th–90th percentile elevation band of those records. The client combines the
+two at query time — what grows near you, crossed with what is ripe now.
 
 Against 10 species with well-documented Santa Barbara phenology, 8 of 10 modelled peaks fall inside
-the documented collection window. Median window width is 45 days.
+the documented collection window, against 7 of 10 for a single pooled regional fit. Median window
+width is 45 days.
 
 ## Elevation
 
@@ -59,22 +74,25 @@ flowering peak already absorbs the effect, and a lapse term would double-count i
   and 9% exceed 200. These are fits that failed rather than long seasons, typically species that
   flower near year-round so the flowering anchor carries no information. The client tags the former
   and drops the latter.
-- **One window is fitted per species for the whole region, and that over-pools.** Splitting the
-  current region at Los Angeles and fitting north and south separately, 50% of well-sampled species
-  disagree by more than 14 days and 21% by more than 30. *Larrea tridentata* peaks in June in the
-  Mojave and November in the southern deserts — 165 days apart — while the pooled fit reports late
-  June and is simply wrong for southern populations. Species whose range spans a strong climate
-  gradient should be read with this in mind; fitting per sub-region is the fix.
+- **Three quarters of fits still borrow from beyond their own tile.** Only 26% of species-tile pairs
+  clear the sample-size bar for a `cell` fit; 64% fall back to the surrounding block and 10% to the
+  whole region. Those are labelled, but a `region` fit carries exactly the pooling problem tiling
+  was built to solve. More observations, not better code, is what moves species up a level.
+- **Tile edges are hard boundaries.** A species is fitted independently either side of a 2° line
+  with no smoothing across it, so two points a kilometre apart on opposite sides of an edge can
+  report different windows.
 - **Windows are climatological averages.** There is no year-to-year adjustment, so a hot or late
   season shifts real phenology in ways the model will not see.
 - **Observation density follows people, not plants.** Roadsides and popular trails are heavily
   over-represented relative to back country.
-- **Handling notes are hand-written and partial.** 165 of 228 species resolve to a note, many only
+- **Handling notes are hand-written and partial.** 732 of 1,129 species resolve to a note, many only
   at family level; each card states which. They are not a substitute for a propagation manual.
 
 ## The app
 
-A single HTML file plus a JSON model. No build step, no framework, no server.
+A single HTML file plus a directory of JSON tiles. No build step, no framework, no server. The
+client loads only the tiles its search circle touches — one for a 25 km search, four when a 100 km
+radius straddles tile boundaries.
 
 - **Find seed** — set a location by tapping the map, dragging the pin, or using device geolocation;
   the search radius is drawn as a circle. Species are grouped into *collectible now*, *coming up*,
@@ -121,17 +139,23 @@ and `days_from_peak`; that signed offset is the ground truth needed to recalibra
 ```
 etl/fetch_inat.py     cursor-paginated pull of annotated observations -> JSONL (resumable)
 etl/add_elevation.py  elevation per ~1 km grid point, cached (resumable)
-etl/build_model.py    fits the per-taxon window -> web/species_<region>.json
+etl/build_model.py    single pooled fit per species -> web/species_<region>.json
+etl/build_tiles.py    per-tile fits with fallback   -> web/tiles_<region>/  (what the app uses)
 etl/enrich_taxa.py    family, native/introduced, conservation listings, seed photos, tips
 etl/tips.json         hand-curated field guidance, by species / genus / family
 web/index.html        the app
 ```
 
 ```bash
-python3 etl/fetch_inat.py sbv && python3 etl/add_elevation.py sbv \
-  && python3 etl/build_model.py sbv && python3 etl/enrich_taxa.py sbv
+python3 etl/fetch_inat.py socal && python3 etl/add_elevation.py socal \
+  && python3 etl/build_model.py socal && python3 etl/enrich_taxa.py socal \
+  && python3 etl/build_tiles.py socal
 python3 -m http.server 8731 --directory web
 ```
+
+`enrich_taxa.py` writes `taxa_meta_<region>.json` alongside its output; `build_tiles.py` merges that
+into every tile a species appears in, so photos and handling notes are fetched once per species
+rather than once per tile.
 
 Serve over http rather than opening the file directly — geolocation and `fetch` both need an origin.
 
@@ -144,27 +168,42 @@ half an hour).
 
 ## Data contract
 
-`species_<region>.json` is the interface between the pipeline and any client, versioned via
-`schema_version`. All dates are integer day-of-year, 1–365, and **wrap**: a window may have
-`ripe_end_doy < ripe_start_doy`. Compute forward distance modulo 365 rather than comparing directly.
+`tiles_<region>/index.json` lists the tiles; each `tiles_<region>/<r>_<c>.json` is self-contained,
+so a client renders from the tiles it loaded and nothing else. Versioned via `schema_version`
+(currently 2). All dates are integer day-of-year, 1–365, and **wrap**: a window may have
+`ripe_end_doy < ripe_start_doy`, so compute forward distance modulo 365 rather than comparing
+directly.
 
 ```jsonc
+// index.json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "generated": "2026-07-31",
-  "region": "sbv",
-  "cell_deg": 0.25,              // occurrence grid size in degrees
+  "region": "socal",
+  "tile_deg": 2.0,               // tile size in degrees
+  "cell_deg": 0.25,              // occurrence grid inside a tile
   "ripe_quantiles": [0.20, 0.35, 0.55],
+  "fit_levels": {"cell": 798, "block": 1932, "region": 292},
+  "tiles": [{"tile": [17, -60], "file": "17_-60.json", "taxa": 762}]
+}
+
+// 17_-60.json  — tile keyed by floor(lat/tile_deg), floor(lng/tile_deg)
+{
+  "schema_version": 2,
+  "tile": [17, -60],
+  "bounds": [34.0, -120.0, 36.0, -118.0],   // south, west, north, east
   "taxa": [{
-    "taxon_id": 47603,           // iNaturalist taxon id
+    "taxon_id": 47603,
     "name": "Heteromeles arbutifolia",
     "common": "Toyon",
     "family": "Rosaceae",
-    "n_fruit": 538,              // fruiting records backing the window
+    "fit_level": "cell",         // "cell" | "block" | "region" — how local the fit is
+    "n_local": 378,              // fruiting records inside this tile
+    "n_fruit": 538,              // records backing the fit at whatever level was used
     "n_flower": 127,
     "method": "flower_anchored", // or "doy_fallback" when flowering data is thin
     "flower_peak_doy": 183,
-    "flower_start_doy": 107,     // flowering span, for the timeline
+    "flower_start_doy": 107,
     "flower_end_doy": 254,
     "ripe_start_doy": 301,       // the collection window
     "ripe_peak_doy": 323,
@@ -173,12 +212,12 @@ half an hour).
     "fruit_start_doy": 258,      // full fruiting span, for context
     "fruit_end_doy": 96,
     "persistence": 0.223,        // >0.3 means the window likely reads late
-    "confidence": 0.978,         // data sufficiency only, n/(n+12)
+    "confidence": 0.978,         // data sufficiency, penalised for non-cell fits
     "season_concentration": 0.61,
     "sensitive": false,          // rare/listed — do not collect
     "status_codes": null,
     "establishment": "native",   // "native" | "introduced" | null if unlisted
-    "elevation": {"lo": 2, "mid": 200, "hi": 569},   // 10th/50th/90th pct, metres
+    "elevation": {"lo": 11, "mid": 200, "hi": 567},  // 10th/50th/90th pct, metres
     "tips": {"cue": "…", "collect": "…", "handling": "…",
              "caution": "…", "scope": "species"},    // scope: species|genus|family
     "photos": [{"url": "…", "license": "cc-by-nc", "by": "…", "obs": 12345}],
@@ -187,9 +226,13 @@ half an hour).
 }
 ```
 
-`confidence` measures data sufficiency only. It is deliberately not mixed with
-`season_concentration`: a genuinely long fruiting season is a fact about the plant, not low
-confidence in the estimate.
+A species appearing in several loaded tiles will carry a different window in each. Resolve by
+preferring the tile containing the query point, then the finest `fit_level`, then the largest
+`n_local`.
+
+`confidence` measures data sufficiency, scaled down for `block` and `region` fits. It is
+deliberately not mixed with `season_concentration`: a genuinely long fruiting season is a fact about
+the plant, not low confidence in the estimate.
 
 `by` and `license` must travel with any displayed photo.
 
