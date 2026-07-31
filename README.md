@@ -1,81 +1,114 @@
 # SeedScout
 
-Given a place and a date, what native plants have collectible seed right now?
+Given a place and a date, which native plants have collectible seed right now?
 
-No existing tool answers that. Seed-zone maps ([USGS](https://www.usgs.gov/apps/seed-toolkit/),
+Live at **[garrettgcraig.com/seedscout](https://garrettgcraig.com/seedscout/)**.
+
+Seed-zone tools ([USGS](https://www.usgs.gov/apps/seed-toolkit/),
 [USFS](https://research.fs.usda.gov/pnw/products/dataandtools/seed-zone-webmap)) answer *where* to
-source seed but say nothing about timing. [USA-NPN](https://www.usanpn.org/data/maps) models fruit
+source seed for a restoration site. [USA-NPN](https://www.usanpn.org/data/maps) models fruit
 ripening for a small set of species as gridded maps. Regional harvest charts are hand-curated and
-fixed. Seeds of Success crews do this reasoning as field craft, not software.
+fixed. SeedScout answers the field question instead: standing here, today, what is ready?
 
-This builds the missing piece from iNaturalist phenology annotations.
+## How the window is modelled
 
-## The core problem
+iNaturalist's controlled term 12 carries a value "Fruits or Seeds". It spans green fruit through
+dehiscence and does not mean *ripe*, so the peak of a species' fruiting records is not its
+collection date.
 
-iNaturalist's controlled term 12 has a value "Fruits or Seeds". **It does not mean ripe.** One
-annotation covers green fruit through dehiscence, so the naive approach — histogram the fruiting
-records by month, take the peak — tells you to collect weeks early.
+Each fruiting record is therefore measured as **days elapsed since that species' flowering peak**
+rather than as a day of year. Fruit follows flowers, so this runs the season along the axis the
+biology actually uses, and it keeps species whose dried fruit persists for months
+(*Malosma*, *Eriogonum*, *Baccharis*) from smearing across the calendar. The ripe window is taken
+as the 20th–55th percentile of that distribution, with the peak at the 35th.
 
-The first attempt here took the *trailing* quantiles of the day-of-year fruiting distribution, on
-the theory that mature seed sits near the end of the fruiting span. That was worse than it looked.
-It works for fleshy fruit that gets eaten or drops quickly, and fails badly for anything whose dry
-fruit persists on the plant: laurel sumac (*Malosma laurina*) generates "fruits" annotations all
-winter from dried drupes, and the model put its ripe window in **March — five months late.**
+Species with too few flowering records fall back to a day-of-year fit and are marked
+`doy_fallback`, which carries a confidence penalty.
 
-The fix is a change of coordinates. Fruit always follows flowers, so each fruiting record is
-measured as **days elapsed since that taxon's flowering peak** rather than as a day of year. This
-linearizes the season along the axis the biology actually runs on and removes the December/January
-wrap that was smearing persistent-fruit species across the calendar.
+Two quantities are kept separate:
 
-Validated against 10 species with well-documented Santa Barbara phenology:
+- **Phenology is regional.** Per-cell sample sizes are far too thin to fit a season, so the window
+  is pooled across the region.
+- **Occurrence is local.** Each species carries the ~25 km grid cells where it has been recorded
+  fruiting, plus the 10th–90th percentile elevation band of those records.
 
-| | day-of-year model | flower-anchored model |
-|---|---|---|
-| peak lands in documented window | 6/10 | **8/10** |
-| median window width | ~130 days | **~47 days** |
+The client combines them at query time: what grows near you, crossed with what is ripe now.
 
-The two remaining misses are the two species with the highest `persistence` score, and the third
-weakest case has n=5 with `confidence` 0.29 — the model flags its own failures, which is the
-property that matters most for a field tool.
+Against 10 species with well-documented Santa Barbara phenology, 8 of 10 modelled peaks fall inside
+the documented collection window. Median window width is 45 days.
 
-## Elevation: a negative result worth recording
+## Elevation
 
-The obvious next move was an elevation correction — phenology runs later at altitude, and Hopkins'
-bioclimatic law puts it around +3.3 days per 100 m. Measured against this dataset, across 47 taxa
-with enough vertical spread:
+Elevation filters **occurrence, not timing**. A species whose fruiting records sit between 2005 m
+and 2651 m is not growing at the coast, and hiding it is the difference between a usable list and
+one padded with montane plants that happen to fall inside the search radius.
 
-| measured on | days per 100 m | IQR | share positive |
-|---|---|---|---|
-| flowering day-of-year | +0.60 | −1.55 to +2.92 | 55% |
-| fruiting day-of-year | +0.85 | −0.36 to +3.29 | 66% |
-| **flower → fruit lag** | **+0.52** | −5.04 to +2.92 | 55% |
-
-The lag the model actually runs on is elevation-insensitive, because flowering and fruiting shift
-together — **anchoring on the flowering peak already absorbs the elevation effect**, and adding a
-lapse term would double-count it. The absolute effect is weak here too, which is unsurprising in a
-summer-dry Mediterranean climate where phenology tracks soil moisture more than heat accumulation.
-
-So elevation is used for **occurrence filtering, not timing**: each taxon carries the 10th–90th
-percentile elevation band of its fruiting records, and the client hides species whose band excludes
-your elevation. Without it, a sea-level Santa Barbara query returned montane snowplant
-(*Sarcodes sanguinea*, 2005–2651 m) simply because it fell inside the search radius.
+It is deliberately not used to shift dates. Measured across 47 taxa with sufficient vertical spread
+in this dataset, flowering shifts +0.60 days per 100 m and fruiting +0.85, so the flower-to-fruit
+lag the model runs on shifts +0.52 with an interquartile range straddling zero. Anchoring on the
+flowering peak already absorbs the effect, and a lapse term would double-count it.
 
 ## Known limits
 
-- **`RIPE_QUANTILES` is calibrated on nine species.** It is the first thing to revisit when field
-  observation disagrees with the app. This is a starting point, not a fitted parameter.
-- **Persistent-fruit taxa still read late.** `persistence` (share of fruiting records landing >210
-  days after the flowering peak) surfaces this per species; anything above ~0.3 deserves suspicion.
+- **`RIPE_QUANTILES` is calibrated against nine species.** It is the first thing to revisit when
+  field observation disagrees with the app.
+- **Persistent-fruit species read late.** `persistence` — the share of fruiting records landing more
+  than 210 days after the flowering peak — flags this per species. Above ~0.3, distrust the window
+  and judge by the condition of the fruit cluster instead.
 - **20% of fitted windows are too wide to act on.** Median width is 45 days, but 11% exceed 100 days
-  and 9% exceed 200. These are fit failures rather than long seasons — typically species that flower
-  near year-round, which leaves the flowering anchor meaningless. The client tags the former and
-  drops the latter.
-- **No year-to-year adjustment.** Windows are climatological averages. A hot or late year shifts
-  real phenology and the model will not know. See the GDD note below.
-- **Observation bias.** iNaturalist density follows people, not plants — roadsides and popular
-  trails are heavily over-represented relative to the backcountry.
-- **Handling notes are hand-written and partial.** 165 of 228 species resolve to a tip, many only at
-  family level (the card says which). They are not a substitute for a propagation manual.
+  and 9% exceed 200. These are fits that failed rather than long seasons, typically species that
+  flower near year-round so the flowering anchor carries no information. The client tags the former
+  and drops the latter.
+- **Windows are climatological averages.** There is no year-to-year adjustment, so a hot or late
+  season shifts real phenology in ways the model will not see.
+- **Observation density follows people, not plants.** Roadsides and popular trails are heavily
+  over-represented relative to back country.
+- **Handling notes are hand-written and partial.** 165 of 228 species resolve to a note, many only
+  at family level; each card states which. They are not a substitute for a propagation manual.
+
+## The app
+
+A single HTML file plus a JSON model. No build step, no framework, no server.
+
+- **Find seed** — set a location by tapping the map, dragging the pin, or using device geolocation;
+  the search radius is drawn as a circle. Species are grouped into *collectible now*, *coming up*,
+  and *just missed*, ranked by proximity to the modelled peak, local abundance, and confidence.
+- **Timeline** — every species shows a full-year bar: flowering period, fruiting period, ripe
+  window, and the selected date.
+- **Photos** — CC-licensed iNaturalist images pulled from observations *inside* each ripe window, so
+  they show fruit rather than flowers. Attribution and licence travel with each image.
+- **Handling notes** — how to tell ripeness, collection technique, and post-collection treatment,
+  resolved species → genus → family.
+- **Guards** — non-natives are filtered out by default; rare and listed species are flagged
+  *do not collect* and down-ranked; the 30-plants / 30%-of-seed rule and permit requirements are
+  stated up front.
+
+Leaflet and CARTO basemaps are loaded from a CDN for the map. If they are unavailable, the map is
+replaced by manual coordinate entry and everything else works unchanged.
+
+## Records and propagation
+
+The second tab tracks a seed lot from the field to the garden.
+
+**Collection** — species, date, location, elevation, quantity, notes.
+
+**Propagation** — storage, scarification, stratification, sowing, and germination. Two things are
+computed rather than stored:
+
+- **Stratification due dates.** A lot reads `stratifying · 40 d left`, then flips to `ready to sow`
+  and appears under *Needs attention*. This is the step that gets missed, because it falls due
+  months after the work that starts it.
+- **Germination rate** — seedlings over seeds sown, and days to first germination.
+
+**Photos** — camera capture at each stage: the parent plant, cleaned seed, first pot, seedlings, and
+final planting location. Images are downscaled to 1400 px and stored in IndexedDB.
+
+Each lot surfaces its species' handling note inline, so a toyon lot shows *"Cold-moist stratify 1–3
+months"* directly above the stratification fields.
+
+Records live in `localStorage` and photos in IndexedDB, both browser-local and never uploaded.
+Export to CSV or JSON. The CSV carries the full propagation schedule alongside `modelled_peak_doy`
+and `days_from_peak`; that signed offset is the ground truth needed to recalibrate `RIPE_QUANTILES`.
 
 ## Layout
 
@@ -85,33 +118,29 @@ etl/add_elevation.py  elevation per ~1 km grid point, cached (resumable)
 etl/build_model.py    fits the per-taxon window -> web/species_<region>.json
 etl/enrich_taxa.py    family, native/introduced, conservation listings, seed photos, tips
 etl/tips.json         hand-curated field guidance, by species / genus / family
-web/index.html        single-file mobile client, no dependencies
+web/index.html        the app
 ```
 
 ```bash
 python3 etl/fetch_inat.py sbv && python3 etl/add_elevation.py sbv \
   && python3 etl/build_model.py sbv && python3 etl/enrich_taxa.py sbv
-```
-
-`build_model.py` carries prior enrichment forward by default, so re-fitting the model does not mean
-re-fetching 228 photos. Pass `--fresh` to discard it.
-
-Then serve `web/` over http (geolocation and `fetch` both need a real origin):
-
-```bash
 python3 -m http.server 8731 --directory web
 ```
 
-Regions are defined in `REGIONS` in the ETL scripts. `sbv` is Santa Barbara + Ventura (~39k
-annotated observations, a few minutes to pull). `socal` is the full coastal Southern California
-region (~408k, roughly half an hour).
+Serve over http rather than opening the file directly — geolocation and `fetch` both need an origin.
+
+`build_model.py` carries prior enrichment forward by default, so re-fitting does not re-fetch every
+photo. Pass `--fresh` to discard it.
+
+Regions are defined in `REGIONS` in the ETL scripts. `sbv` is Santa Barbara + Ventura counties
+(~39k annotated observations, a few minutes). `socal` is coastal Southern California (~408k, around
+half an hour).
 
 ## Data contract
 
-`species_<region>.json` is the seam between the pipeline and any client, and is versioned via
-`schema_version` so the planned iOS app can decode the same payload the web client does. All dates
-are integer day-of-year, 1–365, and **wrap**: a window may have `ripe_end_doy < ripe_start_doy`.
-Compute forward distance modulo 365 rather than comparing directly.
+`species_<region>.json` is the interface between the pipeline and any client, versioned via
+`schema_version`. All dates are integer day-of-year, 1–365, and **wrap**: a window may have
+`ripe_end_doy < ripe_start_doy`. Compute forward distance modulo 365 rather than comparing directly.
 
 ```jsonc
 {
@@ -129,14 +158,14 @@ Compute forward distance modulo 365 rather than comparing directly.
     "n_flower": 127,
     "method": "flower_anchored", // or "doy_fallback" when flowering data is thin
     "flower_peak_doy": 183,
+    "flower_start_doy": 107,     // flowering span, for the timeline
+    "flower_end_doy": 254,
     "ripe_start_doy": 301,       // the collection window
     "ripe_peak_doy": 323,
     "ripe_end_doy": 348,
     "ripe_window_days": 47,
     "fruit_start_doy": 258,      // full fruiting span, for context
     "fruit_end_doy": 96,
-    "flower_start_doy": 107,     // flowering span, for the timeline
-    "flower_end_doy": 254,
     "persistence": 0.223,        // >0.3 means the window likely reads late
     "confidence": 0.978,         // data sufficiency only, n/(n+12)
     "season_concentration": 0.61,
@@ -152,62 +181,27 @@ Compute forward distance modulo 365 rather than comparing directly.
 }
 ```
 
-Photos are CC-licensed and drawn from observations annotated as fruiting **inside** the modelled
-ripe window, so they show seed rather than flowers. `by` and `license` must travel with the image
-wherever it is displayed.
+`confidence` measures data sufficiency only. It is deliberately not mixed with
+`season_concentration`: a genuinely long fruiting season is a fact about the plant, not low
+confidence in the estimate.
 
-Occurrence is local, phenology is regional. Per-cell sample sizes are far too thin to fit a season
-but are plenty to answer "does this grow near me", so `cells` carries the spatial signal and the
-window is pooled across the region. The client combines them at query time.
+`by` and `license` must travel with any displayed photo.
 
-`confidence` is deliberately *not* mixed with `season_concentration`. A genuinely long fruiting
-season is a real fact about a plant, not low confidence in the estimate.
+## Roadmap
 
-## Collection records and propagation
-
-The client's second tab tracks a seed lot from the field through to seedlings:
-
-**Collection** — species, date, GPS, elevation (resolved automatically), quantity, notes.
-
-**Propagation** — storage method and date, scarification, stratification (method, start, duration),
-sowing (date, count, medium), and germination (date, count). The panel is edited in place and saves
-on every change, because a half-filled propagation record is the normal state for months at a time.
-
-Two things it computes rather than stores:
-
-- **Stratification due dates.** A lot stratifying shows `stratifying · 40 d left`; once the clock
-  runs out it flips to `ready to sow` and the lot is listed under **Needs attention** at the top of
-  the tab. This is the step people forget, because it comes due months after the work that started
-  it.
-- **Germination rate**, seedlings over seeds sown, plus days from sowing to first germination.
-
-Each lot's panel also surfaces the species' handling note from `tips.json` inline — so a toyon lot
-shows *"Cold-moist stratify 1–3 months"* directly above the stratification fields.
-
-Records live in `localStorage` only — nothing is uploaded — and export to CSV or JSON. The CSV
-carries the full propagation schedule plus `modelled_peak_doy` and `days_from_peak`. That signed
-offset is precisely the ground truth the model needs, so the logging feature and the calibration
-problem are the same feature. Enough records and `RIPE_QUANTILES` stops being a guess.
-
-Germination outcomes are the second, longer feedback loop: a lot collected well before or after the
-modelled peak that then germinates poorly is direct evidence the window is wrong for that species.
-
-## Next
-
-- **Ground-truth calibration.** The highest-value work by a wide margin. Export the record CSV and
-  refit `RIPE_QUANTILES` against `days_from_peak`, ideally per fruit type.
-- **Fruit-type stratification.** Fleshy vs dry-dehiscent vs dry-persistent almost certainly want
-  different quantiles; family is already in the payload as a rough proxy.
-- **Growing-degree-day anchoring.** Convert day-of-year to accumulated GDD via Daymet or PRISM so
-  windows shift correctly in a hot or late year and transfer across elevation. This is what would
-  make the tool genuinely better than a static chart rather than merely more automated.
-- **iOS client** against the same `species_<region>.json`, bundled for offline use in the field.
+- **Ground-truth calibration.** Export the record CSV and refit `RIPE_QUANTILES` against
+  `days_from_peak`, ideally per fruit type. Fleshy, dry-dehiscent, and dry-persistent almost
+  certainly want different values; family is already in the payload as a rough proxy.
+- **Growing-degree-day anchoring** via Daymet or PRISM, so windows shift with an early or late year
+  instead of resting on a climatological average.
+- **Offline tile caching** and a service worker, so the map works without signal in the field.
+- **iOS client** against the same `species_<region>.json`.
 
 ## Collection ethics
 
-The client enforces what it can and states the rest: collect only from populations of 30+ plants,
-never more than 30% of available seed, never from listed taxa, and never without landowner or
-agency permission — collection is prohibited in most parks and preserves without a permit. Species
-flagged `sensitive` are down-ranked and marked *do not collect*.
+Collect only from populations of 30+ plants, never more than 30% of available seed, never from
+listed taxa, and never without landowner or agency permission — collection is prohibited in most
+parks and preserves without a permit. Species flagged `sensitive` are down-ranked and marked
+*do not collect*.
 
-Data from [iNaturalist](https://www.inaturalist.org), research-grade observations only.
+Observation data from [iNaturalist](https://www.inaturalist.org), research-grade only.

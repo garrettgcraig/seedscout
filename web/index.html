@@ -167,6 +167,31 @@
   .readout{font-size:.78rem;font-weight:700;color:var(--accent)}
   .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
   .hint{font-size:.72rem;color:var(--muted);font-style:italic}
+  /* ---- lot photos ---- */
+  .photobar{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center}
+  .photobar select{width:auto;flex:1 1 8rem;padding:.42rem .5rem;font-size:.82rem}
+  .addphoto{position:relative;overflow:hidden;display:inline-flex;align-items:center;
+    justify-content:center;width:auto;flex:0 0 auto;padding:.42rem .8rem;font-size:.82rem;
+    border-radius:10px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+  @media (prefers-color-scheme:dark){.addphoto{color:#14170f}}
+  .addphoto input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+  .shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:.4rem}
+  .shot{position:relative;margin:0}
+  .shot img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;display:block;
+    border:1px solid var(--line);background:var(--line);cursor:pointer}
+  .shot figcaption{font-size:.6rem;color:var(--muted);margin-top:.18rem;line-height:1.3}
+  .shot .badge{position:absolute;top:.25rem;left:.25rem;font-size:.58rem;font-weight:700;
+    padding:.1rem .34rem;border-radius:20px;background:rgba(0,0,0,.62);color:#fff}
+  .quota{font-size:.7rem;color:var(--muted)}
+
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:none;
+    flex-direction:column;align-items:center;justify-content:center;padding:1rem;gap:.7rem}
+  .lightbox.on{display:flex}
+  .lightbox img{max-width:100%;max-height:72vh;border-radius:10px;object-fit:contain}
+  .lightbox .lbmeta{color:#fff;font-size:.82rem;text-align:center;max-width:36rem}
+  .lightbox .lbrow{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+  .lightbox button{width:auto;padding:.45rem .9rem;font-size:.85rem}
+
   .attention{background:var(--warn-soft);border-left:3px solid var(--warn);border-radius:8px;
     padding:.6rem .75rem;margin-bottom:1rem;font-size:.84rem;display:grid;gap:.3rem}
   .attention b{color:var(--warn)}
@@ -282,6 +307,15 @@
       </div>
       <div><label for="r-notes">Notes</label>
         <textarea id="r-notes" placeholder="Ripeness, population size, permission, habitat…"></textarea></div>
+      <div>
+        <label>Photo of the plant you collected from</label>
+        <div class="photobar">
+          <label class="addphoto">Add photo
+            <input type="file" id="r-photo" accept="image/*" multiple></label>
+          <span class="quota" id="r-pending">none yet</span>
+        </div>
+        <div class="shelf" id="r-pendingshelf" style="margin-top:.45rem"></div>
+      </div>
       <button id="r-save">Save record</button>
     </div>
 
@@ -293,13 +327,28 @@
 
     <div id="attention"></div>
 
-    <div class="row" style="margin-bottom:1rem">
+    <div class="row" style="margin-bottom:.5rem">
       <button id="r-export" class="ghost">Export CSV</button>
       <button id="r-exportj" class="ghost">Export JSON</button>
+    </div>
+    <div class="row" style="margin-bottom:1rem">
+      <button id="r-exportp" class="ghost">Download all photos</button>
+      <span class="quota" id="storageuse" style="align-self:center"></span>
     </div>
     <div id="reclist"></div>
   </section>
 </main>
+
+<div class="lightbox" id="lightbox">
+  <img alt="">
+  <div class="lbmeta"></div>
+  <div class="lbrow">
+    <button class="ghost lbcaption">Caption</button>
+    <button class="ghost lbdownload">Download</button>
+    <button class="ghost lbdelete">Delete</button>
+    <button class="lbclose">Close</button>
+  </div>
+</div>
 
 <footer>
   Windows are modelled from research-grade iNaturalist <em>Flowers and Fruits</em> annotations,
@@ -650,6 +699,162 @@ function updateRecord(id, path, value){
   saveRecords(all);
 }
 
+/* ---------- lot photos ----------
+   Photos live in IndexedDB, not localStorage: a handful of camera images would
+   blow the ~5 MB localStorage quota immediately, and blobs there would have to
+   be base64'd at a 33% size penalty. Everything is downscaled on the way in. */
+const IDB_NAME = 'seedscout', IDB_STORE = 'photos';
+const PHOTO_STAGES = [
+  ['specimen', 'Parent plant'],
+  ['seed',     'Cleaned seed'],
+  ['sown',     'First pot'],
+  ['seedling', 'Seedlings'],
+  ['planted',  'Planted out'],
+];
+const STAGE_LABEL = Object.fromEntries(PHOTO_STAGES);
+const MAX_EDGE = 1400, JPEG_Q = 0.82;
+let IDB = null;
+
+function openDB(){
+  if (IDB) return Promise.resolve(IDB);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const s = req.result.createObjectStore(IDB_STORE, {keyPath: 'id'});
+      s.createIndex('rec', 'rec');
+    };
+    req.onsuccess = () => { IDB = req.result; res(IDB); };
+    req.onerror = () => rej(req.error);
+  });
+}
+
+async function tx(mode, fn){
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const t = db.transaction(IDB_STORE, mode);
+    const out = fn(t.objectStore(IDB_STORE));
+    t.oncomplete = () => res(out?.result ?? out);
+    t.onerror = () => rej(t.error);
+  });
+}
+
+const putPhoto    = p  => tx('readwrite', s => s.put(p));
+const deletePhoto = id => tx('readwrite', s => s.delete(id));
+const allPhotos   = () => tx('readonly',  s => s.getAll());
+
+// Downscale before storing. Phone cameras produce 3-12 MB files; at 1400 px on
+// the long edge these land around 200-400 KB and still resolve seed detail.
+async function shrink(file){
+  const bmp = await createImageBitmap(file, {imageOrientation: 'from-image'});
+  const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close?.();
+  return new Promise(r => c.toBlob(r, 'image/jpeg', JPEG_Q));
+}
+
+async function addPhotos(files, recId, stage){
+  const made = [];
+  for (const f of files){
+    if (!f.type.startsWith('image/')) continue;
+    let blob;
+    try { blob = await shrink(f); }
+    catch { blob = f; }   // unreadable/exotic format: store the original
+    const p = {
+      id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
+      rec: recId, stage, date: new Date().toISOString().slice(0,10),
+      caption: '', blob, bytes: blob.size,
+    };
+    await putPhoto(p);
+    made.push(p);
+  }
+  return made;
+}
+
+function shotHTML(p, url){
+  return `<figure class="shot" data-photo="${p.id}">
+    <span class="badge">${esc(STAGE_LABEL[p.stage] || p.stage)}</span>
+    <img loading="lazy" src="${url}" alt="${esc(STAGE_LABEL[p.stage] || '')} photo">
+    <figcaption>${esc(p.date)}${p.caption ? ' · ' + esc(p.caption) : ''}</figcaption>
+  </figure>`;
+}
+
+// One object URL per photo, cached for the session and revoked only when the
+// photo is deleted. Revoking wholesale on each render races badly: renderLog is
+// async and fires from several places, so an in-flight render would have its
+// URLs revoked by the next call and paint blank thumbnails.
+const URL_CACHE = new Map();
+function objectURL(p){
+  if (!URL_CACHE.has(p.id)) URL_CACHE.set(p.id, URL.createObjectURL(p.blob));
+  return URL_CACHE.get(p.id);
+}
+function dropObjectURL(id){
+  const u = URL_CACHE.get(id);
+  if (u){ URL.revokeObjectURL(u); URL_CACHE.delete(id); }
+}
+
+// Pending photos have no id yet, so they get their own short-lived set.
+let PENDING_URLS = [];
+function pendingURL(blob){
+  const u = URL.createObjectURL(blob);
+  PENDING_URLS.push(u);
+  return u;
+}
+function freePendingURLs(){
+  PENDING_URLS.forEach(URL.revokeObjectURL);
+  PENDING_URLS = [];
+}
+
+async function showStorageUse(){
+  if (!navigator.storage?.estimate) return;
+  try {
+    const {usage} = await navigator.storage.estimate();
+    const photos = await allPhotos();
+    $('storageuse').textContent =
+      `${photos.length} photo${photos.length === 1 ? '' : 's'} · ${(usage/1e6).toFixed(1)} MB used`;
+  } catch {}
+}
+
+/* ---------- lightbox ---------- */
+function openLightbox(p){
+  const box = $('lightbox');
+  const url = URL.createObjectURL(p.blob);
+  box.querySelector('img').src = url;
+  box.querySelector('.lbmeta').textContent =
+    `${STAGE_LABEL[p.stage] || p.stage} · ${p.date}${p.caption ? ' · ' + p.caption : ''}`;
+  box.classList.add('on');
+
+  const close = () => {
+    box.classList.remove('on');
+    URL.revokeObjectURL(url);
+    box.onclick = null;
+  };
+  box.querySelector('.lbclose').onclick = close;
+  box.onclick = e => { if (e.target === box) close(); };
+  box.querySelector('.lbcaption').onclick = async e => {
+    e.stopPropagation();
+    const c = prompt('Caption for this photo', p.caption || '');
+    if (c === null) return;
+    p.caption = c.trim();
+    await putPhoto(p);
+    close(); renderLog();
+  };
+  box.querySelector('.lbdownload').onclick = e => {
+    e.stopPropagation();
+    const a = document.createElement('a');
+    a.href = url; a.download = `${p.rec}-${p.stage}-${p.date}.jpg`; a.click();
+  };
+  box.querySelector('.lbdelete').onclick = async e => {
+    e.stopPropagation();
+    if (!confirm('Delete this photo? It cannot be recovered.')) return;
+    await deletePhoto(p.id);
+    dropObjectURL(p.id);
+    close(); renderLog();
+  };
+}
+
 /* ---------- propagation lifecycle ---------- */
 const STORAGE_METHODS  = ['paper bag, cool + dry', 'sealed, refrigerated', 'sealed, frozen',
                           'open tray, air drying', 'other'];
@@ -707,7 +912,28 @@ const sel = (name, opts, val) => `<select data-path="${name}">
   <option value=""${!val ? ' selected' : ''}>—</option>
   ${opts.map(o => `<option${o === val ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
 
-function propPanel(rec, taxon){
+function photoSection(rec, photos){
+  // Ordered by lifecycle rather than capture time, so a lot reads as a sequence
+  // from parent plant to planted out.
+  const order = PHOTO_STAGES.map(([k]) => k);
+  const sorted = [...photos].sort(
+    (a, b) => order.indexOf(a.stage) - order.indexOf(b.stage) || a.date.localeCompare(b.date));
+  return `<fieldset><legend>Photos</legend>
+    <div class="photobar">
+      <select class="stagepick">${PHOTO_STAGES.map(([k, label], i) =>
+        `<option value="${k}"${i === 0 ? ' selected' : ''}>${label}</option>`).join('')}</select>
+      <label class="addphoto">Add photo
+        <input type="file" class="photoinput" accept="image/*" multiple></label>
+    </div>
+    ${sorted.length
+      ? `<div class="shelf" style="margin-top:.5rem">
+           ${sorted.map(p => shotHTML(p, objectURL(p))).join('')}</div>`
+      : `<div class="hint" style="margin-top:.4rem">No photos yet. Capture the parent plant while
+         you are standing at it — it is the record you cannot reconstruct later.</div>`}
+  </fieldset>`;
+}
+
+function propPanel(rec, taxon, photos = []){
   const p = rec.prop || {}, lc = lifecycle(rec);
   const v = (g, f) => esc(p[g]?.[f] ?? '');
   // Species handling notes already say things like "scarify" or "cold-moist
@@ -724,6 +950,7 @@ function propPanel(rec, taxon){
 
   return `<div class="prop">
     ${hint}
+    ${photoSection(rec, photos)}
     <fieldset><legend>Storage</legend>
       <div class="row3">
         <div><label>Method</label>${sel('storage.method', STORAGE_METHODS, p.storage?.method)}</div>
@@ -776,10 +1003,20 @@ function renderAttention(list){
      </div>`).join('') + `</div>`;
 }
 
-function renderLog(){
+async function renderLog(){
   const list = records().sort((a,b) => b.date.localeCompare(a.date));
   const box = $('reclist');
   renderAttention(list);
+  showStorageUse();
+
+  const byRec = new Map();
+  try {
+    for (const p of await allPhotos()){
+      if (!byRec.has(p.rec)) byRec.set(p.rec, []);
+      byRec.get(p.rec).push(p);
+    }
+  } catch {}   // IndexedDB blocked (private mode): records still work
+
   if (!list.length){
     box.innerHTML = '<div class="empty">No records yet. Logging what you actually collect, and ' +
       'when, is what makes the model better.</div>';
@@ -817,12 +1054,31 @@ function renderLog(){
         <button class="ghost del" style="width:auto;padding:.25rem .6rem;font-size:.75rem">Delete</button>
       </div>`;
 
+    const photos = byRec.get(r.id) || [];
     const panel = document.createElement('div');
-    panel.innerHTML = propPanel(r, t);
+    panel.innerHTML = propPanel(r, t, photos);
     panel.classList.add('hidden');
     el.append(panel);
 
     el.querySelector('.toggle').onclick = () => panel.classList.toggle('hidden');
+
+    panel.querySelector('.photoinput').addEventListener('change', async e => {
+      const files = [...e.target.files];
+      if (!files.length) return;
+      const stage = panel.querySelector('.stagepick').value;
+      const btn = panel.querySelector('.addphoto');
+      btn.textContent = 'Adding…';
+      try { await addPhotos(files, r.id, stage); }
+      catch (err) { alert('Could not save photo: ' + err.message); }
+      e.target.value = '';
+      renderLog();
+    });
+    for (const fig of panel.querySelectorAll('.shot')){
+      fig.querySelector('img').onclick = () => {
+        const p = photos.find(x => x.id === fig.dataset.photo);
+        if (p) openLightbox(p);
+      };
+    }
     // Save on change rather than behind a button: a half-filled propagation
     // panel is the normal state for months at a time.
     panel.addEventListener('change', e => {
@@ -845,6 +1101,49 @@ function renderLog(){
     box.append(el);
   }
 }
+
+// Photos captured before the record exists, held until it has an id to hang off.
+let PENDING = [];
+
+async function renderPending(){
+  $('r-pending').textContent = PENDING.length
+    ? `${PENDING.length} photo${PENDING.length === 1 ? '' : 's'} ready`
+    : 'none yet';
+  const shelf = $('r-pendingshelf');
+  freePendingURLs();
+  shelf.innerHTML = PENDING.map((b, i) =>
+    `<figure class="shot"><span class="badge">Parent plant</span>
+      <img src="${pendingURL(b)}" alt="pending photo">
+      <figcaption>tap to remove</figcaption></figure>`).join('');
+  [...shelf.querySelectorAll('.shot')].forEach((fig, i) => {
+    fig.onclick = () => { PENDING.splice(i, 1); renderPending(); };
+  });
+}
+
+// Downscaling a 12-megapixel phone photo takes long enough that a quick tap on
+// Save would otherwise drop it silently. Hold Save until the work is done.
+let PHOTO_BUSY = 0;
+function setPhotoBusy(delta){
+  PHOTO_BUSY = Math.max(0, PHOTO_BUSY + delta);
+  const b = $('r-save');
+  b.disabled = PHOTO_BUSY > 0;
+  b.textContent = PHOTO_BUSY > 0 ? 'Processing photo…' : 'Save record';
+}
+
+$('r-photo').addEventListener('change', async e => {
+  const files = [...e.target.files];
+  e.target.value = '';
+  setPhotoBusy(1);
+  try {
+    for (const f of files){
+      if (!f.type.startsWith('image/')) continue;
+      try { PENDING.push(await shrink(f)); } catch { PENDING.push(f); }
+    }
+  } finally {
+    setPhotoBusy(-1);
+    renderPending();
+  }
+});
 
 // Pending location for the record form, set by GPS or copied from the map pin.
 let REC_POS = null;
@@ -872,6 +1171,13 @@ $('r-save').onclick = () => {
     notes: $('r-notes').value.trim() || null,
   };
   saveRecords([...records(), rec]);
+  // Attach anything shot before the record existed, now that it has an id.
+  Promise.all(PENDING.map(blob => putPhoto({
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
+    rec: rec.id, stage: 'specimen', date: rec.date, caption: '', blob, bytes: blob.size,
+  }))).then(() => { PENDING = []; renderPending(); renderLog(); })
+     .catch(() => { PENDING = []; renderPending(); });
+
   for (const id of ['r-species','r-qty','r-notes']) $(id).value = '';
   REC_POS = null; $('r-coordtext').textContent = 'not set';
   renderLog();
@@ -926,8 +1232,39 @@ $('r-export').onclick = () => {
   });
   download('seedscout-records.csv', [cols.join(','), ...rows].join('\n'), 'text/csv');
 };
-$('r-exportj').onclick = () =>
-  download('seedscout-records.json', JSON.stringify(records(), null, 2), 'application/json');
+$('r-exportj').onclick = async () => {
+  // Photo metadata travels with the records; the images themselves are exported
+  // separately so the JSON stays readable rather than megabytes of base64.
+  let photos = [];
+  try { photos = (await allPhotos()).map(({blob, ...meta}) => meta); } catch {}
+  const byRec = new Map();
+  for (const p of photos){
+    if (!byRec.has(p.rec)) byRec.set(p.rec, []);
+    byRec.get(p.rec).push(p);
+  }
+  const out = records().map(r => ({...r, photos: byRec.get(r.id) || []}));
+  download('seedscout-records.json', JSON.stringify(out, null, 2), 'application/json');
+};
+
+$('r-exportp').onclick = async () => {
+  const photos = await allPhotos().catch(() => []);
+  if (!photos.length) return alert('No photos to export yet.');
+  if (!confirm(`Download ${photos.length} photo${photos.length === 1 ? '' : 's'}? ` +
+               'Your browser may ask permission for multiple downloads.')) return;
+  const byId = Object.fromEntries(records().map(r => [r.id, r]));
+  for (const p of photos){
+    const rec = byId[p.rec];
+    const who = (rec?.species || 'unknown').replace(/\s+/g, '-').toLowerCase();
+    const url = URL.createObjectURL(p.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${who}_${p.stage}_${p.date}_${p.id}.jpg`;
+    a.click();
+    // Browsers throttle rapid programmatic downloads; pace them.
+    await new Promise(r => setTimeout(r, 350));
+    URL.revokeObjectURL(url);
+  }
+};
 
 /* ---------- wiring ---------- */
 function showTab(which){
