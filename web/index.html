@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>SeedScout — what has collectible seed near you</title>
+<style>
+  :root{
+    --bg:#fbfaf7; --panel:#fff; --ink:#1c1f1a; --muted:#6b7263; --line:#e2e0d6;
+    --accent:#3f6b2e; --accent-soft:#eaf1e3; --warn:#8a5a12; --warn-soft:#fbf1de;
+    --alert:#8c2f2f; --alert-soft:#f8e7e5; --radius:14px;
+    --flower:#b07aa8; --fruit:#7c9e5e; --ripe:#3f6b2e;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#14170f; --panel:#1c2016; --ink:#eef0e6; --muted:#9aa38c; --line:#2e3426;
+      --accent:#9ec97f; --accent-soft:#25301b; --warn:#e0b466; --warn-soft:#2f2716;
+      --alert:#e08b83; --alert-soft:#331d1b;
+      --flower:#c99cc2; --fruit:#7fa163; --ripe:#9ec97f;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.5 ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    padding:0 0 3rem;-webkit-text-size-adjust:100%}
+  header{padding:1.3rem 1.1rem .6rem;max-width:820px;margin:0 auto}
+  h1{margin:0;font-size:1.5rem;letter-spacing:-.02em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:.84rem;margin-top:.25rem}
+  main{max-width:820px;margin:0 auto;padding:0 1.1rem}
+
+  .tabs{display:flex;gap:.4rem;margin:.9rem 0 1rem}
+  .tabs button{flex:1;background:var(--panel);color:var(--muted);border:1px solid var(--line);
+    border-radius:10px;padding:.55rem;font-weight:600;font-size:.9rem;cursor:pointer}
+  .tabs button[aria-selected=true]{background:var(--accent);color:#fff;border-color:transparent}
+  @media (prefers-color-scheme:dark){.tabs button[aria-selected=true]{color:#14170f}}
+
+  .controls{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.9rem;display:grid;gap:.7rem;margin-bottom:1rem}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);margin-bottom:.28rem;font-weight:600}
+  input,select,textarea,button{font:inherit;color:inherit;background:var(--bg);
+    border:1px solid var(--line);border-radius:10px;padding:.6rem .7rem;width:100%}
+  textarea{min-height:4.5rem;resize:vertical}
+  button{background:var(--accent);color:#fff;border-color:transparent;font-weight:600;
+    cursor:pointer;-webkit-appearance:none}
+  @media (prefers-color-scheme:dark){button{color:#14170f}}
+  button:active{opacity:.75}
+  button.ghost{background:var(--bg);color:var(--ink);border-color:var(--line);font-weight:500}
+  .chk{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--muted)}
+  .chk input{width:auto;margin:0}
+
+  .ethics{background:var(--warn-soft);border-left:3px solid var(--warn);
+    border-radius:8px;padding:.7rem .8rem;font-size:.83rem;margin-bottom:1rem}
+  .ethics b{color:var(--warn)}
+
+  /* ---- timeline legend + chart ---- */
+  .legend{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.7rem .85rem;margin-bottom:1rem;font-size:.78rem;color:var(--muted)}
+  .legend .keys{display:flex;flex-wrap:wrap;gap:.9rem;margin-bottom:.4rem}
+  .legend .k{display:flex;align-items:center;gap:.35rem;color:var(--ink)}
+  .swatch{width:16px;height:9px;border-radius:2px;flex:none}
+  .sw-flower{background:var(--flower);opacity:.55}
+  .sw-fruit{background:var(--fruit);opacity:.45}
+  .sw-ripe{background:var(--ripe)}
+  .sw-today{width:2px;height:13px;background:var(--ink);border-radius:1px}
+
+  .tl{margin:.15rem 0 .1rem}
+  .tl svg{display:block;width:100%;height:46px;overflow:visible}
+  .tl .mlab{font-size:8px;fill:var(--muted);letter-spacing:.04em}
+
+  .group{margin:1.4rem 0 .6rem;display:flex;align-items:baseline;gap:.5rem}
+  .group h2{margin:0;font-size:.95rem;letter-spacing:-.01em}
+  .group .n{color:var(--muted);font-size:.8rem}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.8rem .9rem;margin-bottom:.55rem;display:grid;gap:.5rem}
+  .card.sensitive{border-color:var(--alert);background:var(--alert-soft)}
+  .head{display:grid;grid-template-columns:56px 1fr auto;gap:.65rem;align-items:start;
+    cursor:pointer}
+  .head.nophoto{grid-template-columns:1fr auto}
+  .thumb{width:56px;height:56px;border-radius:9px;object-fit:cover;background:var(--line);
+    border:1px solid var(--line)}
+  .name strong{font-size:1.02rem;letter-spacing:-.01em;display:block}
+  .name em{color:var(--muted);font-style:italic;font-size:.85rem;font-weight:400}
+  .when{white-space:nowrap;font-size:.82rem;color:var(--accent);font-weight:700;text-align:right}
+  .when.soon{color:var(--warn)} .when.past{color:var(--muted)}
+  .when small{display:block;font-weight:500;color:var(--muted);font-size:.68rem}
+
+  .tags{display:flex;flex-wrap:wrap;gap:.3rem}
+  .tag{font-size:.68rem;padding:.16rem .45rem;border-radius:20px;background:var(--accent-soft);
+    color:var(--accent);font-weight:600;white-space:nowrap}
+  .tag.grey{background:var(--line);color:var(--muted)}
+  /* Family tags carry a per-family hue via an inline --h, so the same family
+     reads the same colour everywhere. Lightness is fixed per theme to keep
+     contrast even across the hue circle. */
+  /* The outline is not decoration: some family hues land near the accent green,
+     and it keeps them from reading as the semantic "records nearby" tag. */
+  .tag.fam{background:hsl(var(--h) 42% 90%);color:hsl(var(--h) 55% 27%);
+    border:1px solid hsl(var(--h) 38% 72%)}
+  @media (prefers-color-scheme:dark){
+    .tag.fam{background:hsl(var(--h) 26% 20%);color:hsl(var(--h) 58% 72%);
+      border-color:hsl(var(--h) 30% 38%)}
+  }
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  .tag.bad{background:var(--alert-soft);color:var(--alert)}
+
+  .detail{border-top:1px solid var(--line);padding-top:.6rem;display:grid;gap:.55rem;
+    font-size:.86rem}
+  .detail dl{margin:0;display:grid;gap:.4rem}
+  .detail dt{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    font-weight:700}
+  .detail dd{margin:0}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+  .shots figure{margin:0;min-width:0}
+  /* Fixed aspect keeps a portrait and a landscape observation photo aligned. */
+  .shots img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:9px;
+    border:1px solid var(--line);display:block;background:var(--line)}
+  .shots figcaption{font-size:.62rem;line-height:1.35;color:var(--muted);margin-top:.25rem;
+    overflow-wrap:anywhere}
+  .scope{font-size:.66rem;color:var(--muted);font-style:italic}
+  .caution{background:var(--alert-soft);color:var(--alert);border-radius:8px;padding:.5rem .6rem;
+    font-size:.82rem}
+
+  .rec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:.7rem .85rem;margin-bottom:.5rem;display:grid;gap:.3rem}
+  .rec .top{display:flex;justify-content:space-between;gap:.6rem;align-items:baseline}
+  .rec .meta{font-size:.75rem;color:var(--muted)}
+  .rec .delta{font-size:.72rem;font-weight:700}
+
+  /* ---- propagation ---- */
+  .stages{display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.1rem}
+  .stage{font-size:.66rem;padding:.14rem .42rem;border-radius:20px;font-weight:700;
+    background:var(--line);color:var(--muted)}
+  .stage.done{background:var(--accent-soft);color:var(--accent)}
+  .stage.active{background:var(--warn-soft);color:var(--warn)}
+  .stage.late{background:var(--alert-soft);color:var(--alert)}
+  .prop{border-top:1px solid var(--line);margin-top:.45rem;padding-top:.6rem;display:grid;gap:.7rem}
+  .prop fieldset{border:1px solid var(--line);border-radius:10px;padding:.55rem .65rem;margin:0;
+    display:grid;gap:.45rem}
+  .prop legend{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    font-weight:700;padding:0 .3rem}
+  .prop .row3{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+  .prop input,.prop select{padding:.42rem .5rem;font-size:.85rem}
+  .prop label{font-size:.62rem;margin-bottom:.15rem}
+  .readout{font-size:.78rem;font-weight:700;color:var(--accent)}
+  .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
+  .hint{font-size:.72rem;color:var(--muted);font-style:italic}
+  .attention{background:var(--warn-soft);border-left:3px solid var(--warn);border-radius:8px;
+    padding:.6rem .75rem;margin-bottom:1rem;font-size:.84rem;display:grid;gap:.3rem}
+  .attention b{color:var(--warn)}
+  .attention .line{display:flex;justify-content:space-between;gap:.6rem}
+  .attention .line.late b{color:var(--alert)}
+  .empty{color:var(--muted);font-size:.88rem;padding:.9rem;text-align:center;
+    border:1px dashed var(--line);border-radius:var(--radius)}
+  footer{max-width:820px;margin:2.5rem auto 0;padding:1rem 1.1rem;color:var(--muted);
+    font-size:.76rem;border-top:1px solid var(--line)}
+  a{color:var(--accent)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Seed<span>Scout</span></h1>
+  <div class="sub" id="sub">Loading phenology model…</div>
+</header>
+
+<main>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tab-find" aria-selected="true">Find seed</button>
+    <button role="tab" id="tab-log" aria-selected="false">My records</button>
+  </div>
+
+  <!-- ============ FIND ============ -->
+  <section id="pane-find">
+    <div class="controls">
+      <div class="row">
+        <div><label for="date">Date</label><input type="date" id="date"></div>
+        <div><label for="radius">Within</label>
+          <select id="radius">
+            <option value="10">10 km</option><option value="25" selected>25 km</option>
+            <option value="50">50 km</option><option value="100">100 km</option>
+          </select></div>
+      </div>
+      <div class="row">
+        <div><label for="lat">Latitude</label><input id="lat" type="number" step="0.001" value="34.416"></div>
+        <div><label for="lng">Longitude</label><input id="lng" type="number" step="0.001" value="-119.698"></div>
+      </div>
+      <div>
+        <label for="kind">Show</label>
+        <select id="kind">
+          <option value="native" selected>Native species only</option>
+          <option value="all">Everything, natives ranked first</option>
+        </select>
+      </div>
+      <label class="chk"><input type="checkbox" id="elevfilter" checked>
+        Match my elevation (<span id="elevnow">—</span>)</label>
+      <div class="row">
+        <button id="locate" class="ghost">Use my location</button>
+        <button id="go">Show ready seed</button>
+      </div>
+    </div>
+
+    <div class="ethics">
+      <b>Before you collect.</b> Take from populations of <b>30+ plants</b>, and never more than
+      <b>30% of the available seed</b>. Get landowner or agency permission first — collecting is
+      prohibited in most parks and preserves without a permit. Species flagged
+      <span style="color:var(--alert);font-weight:700">rare</span> should not be collected at all.
+    </div>
+
+    <div class="legend">
+      <div class="keys">
+        <span class="k"><i class="swatch sw-flower"></i>in flower</span>
+        <span class="k"><i class="swatch sw-fruit"></i>fruit present</span>
+        <span class="k"><i class="swatch sw-ripe"></i>seed likely ripe</span>
+        <span class="k"><i class="swatch sw-today"></i>selected date</span>
+      </div>
+      Each bar is a full year, January to December. <b>In flower</b> means too early — seed has not
+      set. <b>Fruit present</b> is when iNaturalist records show fruit on the plant, green or dried.
+      <b>Seed likely ripe</b> is the modelled collection window, a subset of the fruiting period.
+      Tap a species for photos and handling notes.
+    </div>
+
+    <div id="out"></div>
+  </section>
+
+  <!-- ============ LOG ============ -->
+  <section id="pane-log" class="hidden">
+    <div class="controls">
+      <div>
+        <label for="r-species">Species</label>
+        <input id="r-species" list="taxalist" placeholder="Start typing a name…" autocomplete="off">
+        <datalist id="taxalist"></datalist>
+      </div>
+      <div class="row">
+        <div><label for="r-date">Date collected</label><input type="date" id="r-date"></div>
+        <div><label for="r-qty">Quantity / effort</label>
+          <input id="r-qty" placeholder="e.g. 1 bag, 20 plants"></div>
+      </div>
+      <div class="row">
+        <div><label for="r-lat">Latitude</label><input id="r-lat" type="number" step="0.00001"></div>
+        <div><label for="r-lng">Longitude</label><input id="r-lng" type="number" step="0.00001"></div>
+      </div>
+      <div><label for="r-notes">Notes</label>
+        <textarea id="r-notes" placeholder="Ripeness, population size, permission, habitat…"></textarea></div>
+      <div class="row">
+        <button id="r-here" class="ghost">Use my GPS</button>
+        <button id="r-save">Save record</button>
+      </div>
+    </div>
+
+    <div class="ethics">
+      Records are stored <b>only in this browser</b> (localStorage) — they are never uploaded.
+      Export regularly to keep them. Logged dates are compared against the modelled window, which
+      is exactly the ground truth needed to recalibrate it.
+    </div>
+
+    <div id="attention"></div>
+
+    <div class="row" style="margin-bottom:1rem">
+      <button id="r-export" class="ghost">Export CSV</button>
+      <button id="r-exportj" class="ghost">Export JSON</button>
+    </div>
+    <div id="reclist"></div>
+  </section>
+</main>
+
+<footer>
+  Windows are modelled from research-grade iNaturalist <em>Flowers and Fruits</em> annotations,
+  measured as days elapsed since each species' flowering peak. They are a scouting aid, not a
+  substitute for looking at the plant: collect when seed is hard, dark, and parts readily from the
+  stem. Photos are CC-licensed iNaturalist observations, chosen from inside each ripe window so
+  they show fruit rather than flowers. Handling notes are hand-written, not derived from data.
+</footer>
+
+<script>
+const DAY = 86400000, CELL = 0.25, LS_KEY = 'seedscout.records.v1';
+// The median fitted window is ~47 days. Much beyond 100 and the fit has failed
+// rather than found a long season - usually a species that flowers near
+// year-round, which leaves the flowering anchor meaningless. Past USELESS_WINDOW
+// the "window" covers most of the calendar and says nothing at all.
+const WIDE_WINDOW = 100, USELESS_WINDOW = 200;
+let MODEL = null, INDEX = new Map(), BY_ID = new Map(), USER_ELEV = null;
+
+const FAMILY_HUE = new Map();
+const $ = id => document.getElementById(id);
+
+// Spread families around the hue circle by golden angle rather than hashing, so
+// the families present are maximally separated instead of randomly clustered.
+// Assignment is over the sorted family list, so it is stable between reloads.
+function assignFamilyHues(taxa){
+  const fams = [...new Set(taxa.map(t => t.family).filter(Boolean))].sort();
+  fams.forEach((f, i) => FAMILY_HUE.set(f, Math.round((i * 137.508) % 360)));
+}
+const doy = d => Math.floor((d - new Date(d.getFullYear(), 0, 0)) / DAY);
+const fmt = n => { const d = new Date(2025, 0, 1); d.setDate(n);
+  return d.toLocaleDateString(undefined, {month:'short', day:'numeric'}); };
+const ahead = (a, b) => ((b - a) % 365 + 365) % 365;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function haversine(a, b, c, d){
+  const R = 6371, r = Math.PI/180;
+  const dp = (c-a)*r, dl = (d-b)*r;
+  const x = Math.sin(dp/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+
+/* ---------- timeline ---------- */
+// A window may wrap the year end, so it can need two rectangles.
+function segments(start, end){
+  if (start == null || end == null) return [];
+  const a = (start-1)/365*100, w = (ahead(start, end) || 365)/365*100;
+  return a + w <= 100 ? [[a, w]] : [[a, 100-a], [0, a+w-100]];
+}
+
+function timeline(t, today){
+  const H = 46, rows = [
+    {y:4,  h:7,  cls:'sw-flower', a:t.flower_start_doy, b:t.flower_end_doy, o:.55},
+    {y:13, h:7,  cls:'sw-fruit',  a:t.fruit_start_doy,  b:t.fruit_end_doy,  o:.45},
+    {y:22, h:11, cls:'sw-ripe',   a:t.ripe_start_doy,   b:t.ripe_end_doy,   o:1},
+  ];
+  const fill = {'sw-flower':'var(--flower)','sw-fruit':'var(--fruit)','sw-ripe':'var(--ripe)'};
+  let s = `<svg viewBox="0 0 100 ${H}" preserveAspectRatio="none" role="img"
+    aria-label="Year timeline: flowering, fruiting, and ripe-seed periods">`;
+  // month gridlines
+  for (let m = 1; m < 12; m++){
+    const x = (new Date(2025, m, 1) - new Date(2025, 0, 0))/DAY/365*100;
+    s += `<line x1="${x}" y1="2" x2="${x}" y2="35" stroke="var(--line)" stroke-width=".3"/>`;
+  }
+  s += `<rect x="0" y="2" width="100" height="33" fill="none" stroke="var(--line)" stroke-width=".3"/>`;
+  for (const r of rows)
+    for (const [x, w] of segments(r.a, r.b))
+      s += `<rect x="${x}" y="${r.y}" width="${w}" height="${r.h}" rx="1.2"
+             fill="${fill[r.cls]}" opacity="${r.o}"/>`;
+  // peak tick inside the ripe band
+  if (t.ripe_peak_doy != null){
+    const px = (t.ripe_peak_doy-1)/365*100;
+    s += `<line x1="${px}" y1="23" x2="${px}" y2="32" stroke="var(--panel)" stroke-width=".8"/>`;
+  }
+  const tx = (today-1)/365*100;
+  s += `<line x1="${tx}" y1="0" x2="${tx}" y2="37" stroke="var(--ink)" stroke-width=".7"/>`;
+  s += `<g class="mlab">` + 'JFMAMJJASOND'.split('').map((m, i) =>
+    `<text x="${(i+.5)/12*100}" y="44" text-anchor="middle">${m}</text>`).join('') + `</g></svg>`;
+  return `<div class="tl">${s}</div>`;
+}
+
+/* ---------- data ---------- */
+async function load(){
+  MODEL = await (await fetch('species_sbv.json')).json();
+  assignFamilyHues(MODEL.taxa);
+  for (const t of MODEL.taxa){
+    BY_ID.set(t.taxon_id, t);
+    for (const [cell, n] of Object.entries(t.cells)){
+      if (!INDEX.has(cell)) INDEX.set(cell, []);
+      INDEX.get(cell).push({t, n});
+    }
+  }
+  $('sub').innerHTML = `${MODEL.taxa.length} species modelled from iNaturalist observations ·
+    ${MODEL.region.toUpperCase()} · built ${MODEL.generated}`;
+  $('taxalist').innerHTML = MODEL.taxa
+    .map(t => `<option value="${esc(t.name)}">${esc(t.common || '')}</option>`).join('');
+  $('date').value = $('r-date').value = new Date().toISOString().slice(0,10);
+  lookupElevation();
+  run(); renderLog();
+}
+
+// Elevation for the query point. Failure is non-fatal: the filter just turns off.
+async function lookupElevation(){
+  const lat = +$('lat').value, lng = +$('lng').value;
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
+    USER_ELEV = (await r.json()).elevation[0];
+    $('elevnow').textContent = `${Math.round(USER_ELEV)} m`;
+  } catch {
+    USER_ELEV = null;
+    $('elevnow').textContent = 'unavailable';
+    $('elevfilter').checked = false;
+  }
+  run();
+}
+
+function nearby(lat, lng, km){
+  const span = Math.ceil(km/(111*CELL)) + 1;
+  const r0 = Math.floor(lat/CELL), c0 = Math.floor(lng/CELL);
+  const totals = new Map();
+  for (let r = r0-span; r <= r0+span; r++)
+    for (let c = c0-span; c <= c0+span; c++){
+      if (haversine(lat, lng, (r+0.5)*CELL, (c+0.5)*CELL) > km + 111*CELL/2) continue;
+      for (const {t, n} of (INDEX.get(`${r},${c}`) || []))
+        totals.set(t, (totals.get(t)||0) + n);
+    }
+  return totals;
+}
+
+function classify(t, today){
+  const width = ahead(t.ripe_start_doy, t.ripe_end_doy) || 1;
+  const into  = ahead(t.ripe_start_doy, today);
+  if (into <= width) return {state:'now', into, width,
+    peak: 1 - Math.abs(into - ahead(t.ripe_start_doy, t.ripe_peak_doy)) / width};
+  const until = ahead(today, t.ripe_start_doy);
+  const since = ahead(t.ripe_end_doy, today);
+  return until <= since ? {state:'soon', until, width} : {state:'past', since, width};
+}
+
+/* ---------- rendering ---------- */
+function card(t, local, c, today){
+  const el = document.createElement('div');
+  el.className = 'card' + (t.sensitive ? ' sensitive' : '');
+
+  const when = c.state === 'now' ? (c.peak > .55 ? 'peak now' : 'in window')
+             : c.state === 'soon' ? `in ~${c.until} d` : `${c.since} d ago`;
+  const sub = c.state === 'now' ? `${fmt(t.ripe_start_doy)} – ${fmt(t.ripe_end_doy)}`
+            : c.state === 'soon' ? `from ${fmt(t.ripe_start_doy)}` : `ended ${fmt(t.ripe_end_doy)}`;
+
+  const tags = [];
+  if (t.sensitive) tags.push(['bad', 'rare — do not collect']);
+  if (t.establishment === 'introduced') tags.push(['grey', 'non-native']);
+  if (t.family) tags.push(['fam', t.family, `--h:${FAMILY_HUE.get(t.family) ?? 0}`]);
+  tags.push([local >= 8 ? '' : 'grey', `${local} record${local===1?'':'s'} nearby`]);
+  if (t.elevation) tags.push(['grey', `${t.elevation.lo}–${t.elevation.hi} m`]);
+  if (t.confidence < 0.5) tags.push(['warn', `low confidence · n=${t.n_fruit}`]);
+  if (t.persistence > 0.3) tags.push(['warn', 'fruit persists — may read late']);
+  if (t.method === 'doy_fallback') tags.push(['warn', 'no flowering data']);
+  if (t.ripe_window_days > WIDE_WINDOW)
+    tags.push(['warn', `${t.ripe_window_days} d window — too vague to time`]);
+
+  const photo = t.photos && t.photos[0];
+  el.innerHTML = `
+    <div class="head ${photo ? '' : 'nophoto'}">
+      ${photo ? `<img class="thumb" loading="lazy" src="${esc(photo.url)}" alt="${esc(t.name)} in fruit">` : ''}
+      <div class="name"><strong>${esc(t.common || t.name)}</strong><em>${esc(t.name)}</em></div>
+      <div class="when ${c.state}">${when}<small>${sub}</small></div>
+    </div>
+    ${timeline(t, today)}
+    <div class="tags">${tags.map(([k, v, style]) =>
+      `<span class="tag ${k}"${style ? ` style="${style}"` : ''}>${esc(v)}</span>`).join('')}</div>`;
+
+  const detail = document.createElement('div');
+  detail.className = 'detail hidden';
+  detail.innerHTML = detailHTML(t);
+  el.append(detail);
+  el.querySelector('.head').onclick = () => detail.classList.toggle('hidden');
+
+  const btn = detail.querySelector('.logbtn');
+  if (btn) btn.onclick = () => {
+    $('r-species').value = t.name;
+    $('r-lat').value = $('lat').value; $('r-lng').value = $('lng').value;
+    showTab('log'); window.scrollTo({top:0, behavior:'smooth'});
+  };
+  return el;
+}
+
+function detailHTML(t){
+  const p = t.tips, shots = t.photos || [];
+  const scopeNote = p && p.scope !== 'species'
+    ? `<div class="scope">General ${p.scope}-level guidance — not specific to this species.</div>` : '';
+  return `
+    ${shots.length ? `<div class="shots">${shots.map(s => `
+      <figure><img loading="lazy" src="${esc(s.url)}" alt="${esc(t.name)} in fruit">
+      <figcaption>© ${esc(s.by)} · ${esc(s.license.toUpperCase())} ·
+      <a href="https://www.inaturalist.org/observations/${s.obs}" target="_blank" rel="noopener">iNat</a>
+      </figcaption></figure>`).join('')}</div>` : ''}
+    ${p ? `<dl>
+      <div><dt>How to tell it is ready</dt><dd>${esc(p.cue)}</dd></div>
+      <div><dt>Collecting</dt><dd>${esc(p.collect)}</dd></div>
+      <div><dt>After collection</dt><dd>${esc(p.handling)}</dd></div>
+    </dl>${p.caution ? `<div class="caution"><b>Caution.</b> ${esc(p.caution)}</div>` : ''}${scopeNote}`
+    : `<div class="scope">No handling notes recorded for this species yet.</div>`}
+    <dl><div><dt>Model</dt><dd>
+      Ripe window ${fmt(t.ripe_start_doy)} – ${fmt(t.ripe_end_doy)}, peak ${fmt(t.ripe_peak_doy)},
+      from ${t.n_fruit} fruiting and ${t.n_flower} flowering records.
+      ${t.flower_to_ripe_days != null ? `Roughly ${t.flower_to_ripe_days} days after peak bloom.` : ''}
+    </dd></div></dl>
+    <button class="logbtn ghost">Log a collection of this species</button>`;
+}
+
+function run(){
+  if (!MODEL) return;
+  const lat = +$('lat').value, lng = +$('lng').value, km = +$('radius').value;
+  const today = doy(new Date($('date').value + 'T12:00'));
+  const nativesOnly = $('kind').value === 'native';
+  const useElev = $('elevfilter').checked && USER_ELEV != null;
+  const buckets = {now:[], soon:[], past:[]};
+
+  for (const [t, local] of nearby(lat, lng, km)){
+    if (nativesOnly && t.establishment === 'introduced') continue;
+    // Elevation is used for presence, not timing: a montane species inside the
+    // radius is still not growing at the coast. Margin is generous because the
+    // band comes from a 10th-90th percentile of observations.
+    if (useElev && t.elevation &&
+        (USER_ELEV < t.elevation.lo - 300 || USER_ELEV > t.elevation.hi + 300)) continue;
+    // A window covering most of the year is not a prediction; showing it as
+    // "collectible now" would be a false positive dressed up as a result.
+    if (t.ripe_window_days > USELESS_WINDOW) continue;
+    const c = classify(t, today);
+    if (c.state === 'soon' && c.until > 45) continue;
+    if (c.state === 'past' && c.since > 21) continue;
+    const score = (c.state === 'now' ? 1 + c.peak : c.state === 'soon' ? .5 - c.until/200 : .2)
+                * Math.log1p(local) * (0.35 + t.confidence)
+                * (t.establishment === 'introduced' ? 0.3 : 1)
+                * (t.sensitive ? 0.15 : 1)
+                * (t.ripe_window_days > WIDE_WINDOW ? 0.4 : 1);
+    buckets[c.state].push({t, local, c, score});
+  }
+
+  const out = $('out'); out.innerHTML = '';
+  const titles = {now:'Collectible now', soon:'Coming up (next 6 weeks)', past:'Just missed'};
+  let any = false;
+  for (const k of ['now','soon','past']){
+    const list = buckets[k].sort((a,b) => b.score - a.score);
+    if (!list.length) continue;
+    any = true;
+    const h = document.createElement('div');
+    h.className = 'group';
+    h.innerHTML = `<h2>${titles[k]}</h2><span class="n">${list.length}</span>`;
+    out.append(h);
+    for (const r of list.slice(0, 40)) out.append(card(r.t, r.local, r.c, today));
+  }
+  if (!any) out.innerHTML = '<div class="empty">No modelled species match. Try a larger radius, ' +
+    'or switch off the elevation filter. The pilot dataset covers Santa Barbara and Ventura counties.</div>';
+}
+
+/* ---------- collection records ---------- */
+const records = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+                        catch { return []; } };
+const saveRecords = r => localStorage.setItem(LS_KEY, JSON.stringify(r));
+
+function updateRecord(id, path, value){
+  const all = records(), rec = all.find(r => r.id === id);
+  if (!rec) return;
+  const [group, field] = path.split('.');
+  rec.prop = rec.prop || {};
+  rec.prop[group] = rec.prop[group] || {};
+  rec.prop[group][field] = value === '' ? null : value;
+  saveRecords(all);
+}
+
+/* ---------- propagation lifecycle ---------- */
+const STORAGE_METHODS  = ['paper bag, cool + dry', 'sealed, refrigerated', 'sealed, frozen',
+                          'open tray, air drying', 'other'];
+const SCARIFY_METHODS  = ['none needed', 'sandpaper / nick', 'hot water soak', 'acid',
+                          'smoke or charate', 'other'];
+const STRATIFY_METHODS = ['none needed', 'cold-moist', 'warm-moist', 'cold-dry',
+                          'warm then cold', 'other'];
+
+const today0 = () => { const d = new Date(); d.setHours(12,0,0,0); return d; };
+const parseDate = s => s ? new Date(s + 'T12:00') : null;
+const daysBetween = (a, b) => Math.round((b - a) / DAY);
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const isoDate = d => d.toISOString().slice(0,10);
+
+// Where a seed lot currently sits, and what it is waiting on. The stratification
+// end date is the only genuinely time-critical thing here: it is the step people
+// forget, because it comes due months after the work that started it.
+function lifecycle(rec){
+  const p = rec.prop || {}, out = {stages: [], due: null};
+  out.stages.push({label: 'collected', cls: 'done'});
+  if (p.storage?.method) out.stages.push({label: `stored: ${p.storage.method}`, cls: 'done'});
+  if (p.scarify?.method && p.scarify.method !== 'none needed')
+    out.stages.push({label: `scarified: ${p.scarify.method}`, cls: 'done'});
+
+  const st = p.stratify;
+  if (st?.method && st.method !== 'none needed' && st.start && +st.days > 0){
+    const end = addDays(parseDate(st.start), +st.days);
+    const left = daysBetween(today0(), end);
+    out.stratEnd = end;
+    if (p.sown?.date){
+      out.stages.push({label: `stratified ${st.days} d`, cls: 'done'});
+    } else if (left > 0){
+      out.stages.push({label: `stratifying · ${left} d left`, cls: 'active'});
+      out.due = {when: end, left, text: `${st.method} ends ${isoDate(end)}`};
+    } else {
+      out.stages.push({label: `ready to sow · ${-left} d`, cls: 'late'});
+      out.due = {when: end, left, text: `${st.method} finished ${isoDate(end)} — sow it`};
+    }
+  }
+
+  if (p.sown?.date){
+    out.stages.push({label: `sown ${p.sown.date}`, cls: 'done'});
+    const sown = +p.sown.count || 0, up = +(p.germ?.count) || 0;
+    if (p.germ?.date && sown > 0){
+      out.rate = up / sown;
+      out.days = daysBetween(parseDate(p.sown.date), parseDate(p.germ.date));
+      out.stages.push({label: `${Math.round(out.rate*100)}% germination`,
+                       cls: out.rate >= 0.2 ? 'done' : 'late'});
+    }
+  }
+  return out;
+}
+
+const sel = (name, opts, val) => `<select data-path="${name}">
+  <option value=""${!val ? ' selected' : ''}>—</option>
+  ${opts.map(o => `<option${o === val ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+
+function propPanel(rec, taxon){
+  const p = rec.prop || {}, lc = lifecycle(rec);
+  const v = (g, f) => esc(p[g]?.[f] ?? '');
+  // Species handling notes already say things like "scarify" or "cold-moist
+  // stratify 1-3 months" - surface them here rather than making the user
+  // remember which tab they were on.
+  const hint = taxon?.tips?.handling
+    ? `<div class="hint">Handling note: ${esc(taxon.tips.handling)}</div>` : '';
+  const strat = lc.stratEnd
+    ? `<div class="readout ${lc.due ? (lc.due.left > 0 ? 'active' : 'late') : ''}">
+         ${lc.due ? esc(lc.due.text) : `finished ${isoDate(lc.stratEnd)}`}</div>` : '';
+  const germ = lc.rate != null
+    ? `<div class="readout">${Math.round(lc.rate*100)}% germinated
+        (${+p.germ.count} of ${+p.sown.count}) · ${lc.days} days from sowing</div>` : '';
+
+  return `<div class="prop">
+    ${hint}
+    <fieldset><legend>Storage</legend>
+      <div class="row3">
+        <div><label>Method</label>${sel('storage.method', STORAGE_METHODS, p.storage?.method)}</div>
+        <div><label>Since</label><input type="date" data-path="storage.date" value="${v('storage','date')}"></div>
+      </div>
+    </fieldset>
+    <fieldset><legend>Scarification</legend>
+      <div class="row3">
+        <div><label>Method</label>${sel('scarify.method', SCARIFY_METHODS, p.scarify?.method)}</div>
+        <div><label>Date</label><input type="date" data-path="scarify.date" value="${v('scarify','date')}"></div>
+      </div>
+    </fieldset>
+    <fieldset><legend>Stratification</legend>
+      <div><label>Method</label>${sel('stratify.method', STRATIFY_METHODS, p.stratify?.method)}</div>
+      <div class="row3">
+        <div><label>Start</label><input type="date" data-path="stratify.start" value="${v('stratify','start')}"></div>
+        <div><label>Duration (days)</label><input type="number" min="0" data-path="stratify.days"
+          placeholder="e.g. 60" value="${v('stratify','days')}"></div>
+      </div>
+      ${strat}
+    </fieldset>
+    <fieldset><legend>Sowing &amp; germination</legend>
+      <div class="row3">
+        <div><label>Sown on</label><input type="date" data-path="sown.date" value="${v('sown','date')}"></div>
+        <div><label>Seeds sown</label><input type="number" min="0" data-path="sown.count"
+          value="${v('sown','count')}"></div>
+      </div>
+      <div><label>Medium / container</label><input data-path="sown.medium"
+        placeholder="e.g. 1:1 perlite:peat, 4-inch pots" value="${v('sown','medium')}"></div>
+      <div class="row3">
+        <div><label>First germination</label><input type="date" data-path="germ.date" value="${v('germ','date')}"></div>
+        <div><label>Seedlings up</label><input type="number" min="0" data-path="germ.count"
+          value="${v('germ','count')}"></div>
+      </div>
+      ${germ}
+    </fieldset>
+  </div>`;
+}
+
+function renderAttention(list){
+  const box = $('attention');
+  const due = list.map(r => ({r, lc: lifecycle(r)}))
+                  .filter(x => x.lc.due && x.lc.due.left <= 14)
+                  .sort((a,b) => a.lc.due.left - b.lc.due.left);
+  if (!due.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="attention"><b>Needs attention</b>` + due.map(({r, lc}) =>
+    `<div class="line ${lc.due.left <= 0 ? 'late' : ''}">
+       <span>${esc(r.common || r.species)}</span>
+       <b>${lc.due.left > 0 ? `${lc.due.left} d left` : `${-lc.due.left} d overdue`}</b>
+     </div>`).join('') + `</div>`;
+}
+
+function renderLog(){
+  const list = records().sort((a,b) => b.date.localeCompare(a.date));
+  const box = $('reclist');
+  renderAttention(list);
+  if (!list.length){
+    box.innerHTML = '<div class="empty">No records yet. Logging what you actually collect, and ' +
+      'when, is what makes the model better.</div>';
+    return;
+  }
+  box.innerHTML = '';
+  for (const r of list){
+    const t = BY_ID.get(r.taxon_id);
+    let delta = '';
+    if (t){
+      // Signed offset from the modelled peak, the quantity worth calibrating on.
+      const d = doy(new Date(r.date + 'T12:00'));
+      const fwd = ahead(t.ripe_peak_doy, d), back = ahead(d, t.ripe_peak_doy);
+      const off = fwd <= back ? fwd : -back;
+      const col = Math.abs(off) <= 14 ? 'var(--accent)' : Math.abs(off) <= 35 ? 'var(--warn)' : 'var(--alert)';
+      delta = `<div class="delta" style="color:${col}">
+        ${off === 0 ? 'on the modelled peak' : `${Math.abs(off)} d ${off > 0 ? 'after' : 'before'} modelled peak`}
+        (${fmt(t.ripe_peak_doy)})</div>`;
+    }
+    const lc = lifecycle(r);
+    const el = document.createElement('div');
+    el.className = 'rec';
+    el.innerHTML = `
+      <div class="top"><div><strong>${esc(r.common || r.species)}</strong>
+        ${r.common ? `<em style="color:var(--muted);font-size:.8rem"> ${esc(r.species)}</em>` : ''}</div>
+        <div class="meta">${esc(r.date)}</div></div>
+      ${delta}
+      <div class="meta">${r.lat != null ? `${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}` : 'no location'}
+        ${r.elev != null ? ` · ${Math.round(r.elev)} m` : ''}${r.qty ? ` · ${esc(r.qty)}` : ''}</div>
+      ${r.notes ? `<div style="font-size:.84rem">${esc(r.notes)}</div>` : ''}
+      <div class="stages">${lc.stages.map(s =>
+        `<span class="stage ${s.cls}">${esc(s.label)}</span>`).join('')}</div>
+      <div style="display:flex;gap:.4rem;margin-top:.2rem">
+        <button class="ghost toggle" style="width:auto;padding:.25rem .6rem;font-size:.75rem">Propagation</button>
+        <button class="ghost del" style="width:auto;padding:.25rem .6rem;font-size:.75rem">Delete</button>
+      </div>`;
+
+    const panel = document.createElement('div');
+    panel.innerHTML = propPanel(r, t);
+    panel.classList.add('hidden');
+    el.append(panel);
+
+    el.querySelector('.toggle').onclick = () => panel.classList.toggle('hidden');
+    // Save on change rather than behind a button: a half-filled propagation
+    // panel is the normal state for months at a time.
+    panel.addEventListener('change', e => {
+      const path = e.target.dataset.path;
+      if (!path) return;
+      updateRecord(r.id, path, e.target.value);
+      const open = !panel.classList.contains('hidden');
+      renderLog();
+      if (open){
+        const again = [...document.querySelectorAll('.rec')]
+          .find(n => n.querySelector('strong').textContent === (r.common || r.species));
+        again?.querySelector('.toggle')?.click();
+      }
+    });
+    el.querySelector('.del').onclick = () => {
+      if (!confirm(`Delete the ${r.species} record from ${r.date}?`)) return;
+      saveRecords(records().filter(x => x.id !== r.id));
+      renderLog();
+    };
+    box.append(el);
+  }
+}
+
+$('r-save').onclick = () => {
+  const species = $('r-species').value.trim();
+  if (!species) return alert('Which species?');
+  const match = MODEL.taxa.find(t => t.name.toLowerCase() === species.toLowerCase()
+                                  || (t.common || '').toLowerCase() === species.toLowerCase());
+  const rec = {
+    id: Date.now().toString(36),
+    species: match ? match.name : species,
+    common: match ? match.common : null,
+    taxon_id: match ? match.taxon_id : null,
+    date: $('r-date').value || new Date().toISOString().slice(0,10),
+    lat: $('r-lat').value === '' ? null : +$('r-lat').value,
+    lng: $('r-lng').value === '' ? null : +$('r-lng').value,
+    elev: null,
+    qty: $('r-qty').value.trim() || null,
+    notes: $('r-notes').value.trim() || null,
+  };
+  saveRecords([...records(), rec]);
+  for (const id of ['r-species','r-qty','r-notes']) $(id).value = '';
+  renderLog();
+  if (rec.lat != null) fetch(
+    `https://api.open-meteo.com/v1/elevation?latitude=${rec.lat}&longitude=${rec.lng}`)
+    .then(r => r.json()).then(j => {
+      const all = records(); const hit = all.find(x => x.id === rec.id);
+      if (hit){ hit.elev = j.elevation[0]; saveRecords(all); renderLog(); }
+    }).catch(() => {});
+};
+
+$('r-here').onclick = () => {
+  $('r-here').textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    p => { $('r-lat').value = p.coords.latitude.toFixed(5);
+           $('r-lng').value = p.coords.longitude.toFixed(5);
+           $('r-here').textContent = 'Use my GPS'; },
+    () => { $('r-here').textContent = 'GPS unavailable'; },
+    {enableHighAccuracy:true, timeout:15000});
+};
+
+function download(name, text, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type}));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+
+$('r-export').onclick = () => {
+  const base = ['date','species','common','taxon_id','lat','lng','elev','qty','notes'];
+  const propCols = ['storage.method','storage.date','scarify.method','scarify.date',
+                    'stratify.method','stratify.start','stratify.days','sown.date','sown.count',
+                    'sown.medium','germ.date','germ.count'];
+  const cols = [...base, 'modelled_peak_doy','days_from_peak',
+                ...propCols.map(c => c.replace('.','_')),
+                'stratify_end','germination_rate','days_to_germination'];
+  const rows = records().map(r => {
+    const t = BY_ID.get(r.taxon_id), lc = lifecycle(r);
+    let peak = '', off = '';
+    if (t){
+      const d = doy(new Date(r.date + 'T12:00'));
+      const fwd = ahead(t.ripe_peak_doy, d), back = ahead(d, t.ripe_peak_doy);
+      peak = t.ripe_peak_doy; off = fwd <= back ? fwd : -back;
+    }
+    const vals = [
+      ...base.map(c => r[c] ?? ''), peak, off,
+      ...propCols.map(c => { const [g, f] = c.split('.'); return r.prop?.[g]?.[f] ?? ''; }),
+      lc.stratEnd ? isoDate(lc.stratEnd) : '',
+      lc.rate != null ? lc.rate.toFixed(3) : '',
+      lc.days ?? '',
+    ];
+    return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+  });
+  download('seedscout-records.csv', [cols.join(','), ...rows].join('\n'), 'text/csv');
+};
+$('r-exportj').onclick = () =>
+  download('seedscout-records.json', JSON.stringify(records(), null, 2), 'application/json');
+
+/* ---------- wiring ---------- */
+function showTab(which){
+  $('tab-find').setAttribute('aria-selected', which === 'find');
+  $('tab-log').setAttribute('aria-selected', which === 'log');
+  $('pane-find').classList.toggle('hidden', which !== 'find');
+  $('pane-log').classList.toggle('hidden', which === 'find');
+}
+$('tab-find').onclick = () => showTab('find');
+$('tab-log').onclick = () => { showTab('log'); renderLog(); };
+
+$('go').onclick = run;
+for (const id of ['date','radius','kind','elevfilter']) $(id).onchange = run;
+for (const id of ['lat','lng']) $(id).onchange = lookupElevation;
+$('locate').onclick = () => {
+  $('locate').textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(
+    p => { $('lat').value = p.coords.latitude.toFixed(3);
+           $('lng').value = p.coords.longitude.toFixed(3);
+           $('locate').textContent = 'Use my location'; lookupElevation(); },
+    () => { $('locate').textContent = 'Location unavailable'; },
+    {enableHighAccuracy:false, timeout:10000});
+};
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Raw observation pulls are large and reproducible from the ETL.
+data/*.jsonl
+data/*.state.json
+__pycache__/
+.DS_Store

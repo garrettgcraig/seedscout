@@ -1,0 +1,255 @@
+{
+  "_note": "Hand-curated field guidance. NOT derived from iNaturalist data. Family entries are the fallback; taxon entries override them. Ripeness cues beat calendars every time - this file exists so the app tells you what to look at, not just when to look.",
+  "_schema": "cue = how to tell it is ready | collect = technique | handling = after collection | caution = risk or legal note",
+
+  "by_family": {
+    "Asteraceae": {
+      "cue": "Pappus (the fluff) has dried and begun to lift; heads look grey and open rather than green and tight.",
+      "collect": "Tug lightly - ripe achenes release with almost no resistance. If you have to pull, come back in a week.",
+      "handling": "Dries fast. Rub heads over a screen to separate achenes from chaff; many species have a high proportion of empty seed, so check fill by pinching."
+    },
+    "Fabaceae": {
+      "cue": "Pods leathery to papery and turning brown; seeds rattle loose inside.",
+      "collect": "Many pods dehisce explosively - bag whole infructescences before they twist open, or check plants every few days.",
+      "handling": "Hard-coated seed benefits from scarification before sowing. Freeze or heat-treat to kill bruchid beetle larvae, which are common."
+    },
+    "Poaceae": {
+      "cue": "Florets straw-coloured, seed firm; awns twist when dry.",
+      "collect": "Strip the seed head upward through a closed hand into a bag. Ripe seed shatters readily - a light shake tells you.",
+      "handling": "Keep well ventilated. Awned grasses tangle badly; leave awns on unless you are sowing with a drill."
+    },
+    "Lamiaceae": {
+      "cue": "Calyces dry and brown, nutlets dark and hard inside.",
+      "collect": "Bend the stalk over a bag and tap - ripe nutlets fall out cleanly.",
+      "handling": "Winnow chaff gently; nutlets are small and blow away easily."
+    },
+    "Rosaceae": {
+      "cue": "Varies with fruit type - fleshy fruits fully coloured and slightly soft, dry achenes brown and loose.",
+      "collect": "Pick fleshy fruit by hand; strip plumed achenes when they detach at a touch.",
+      "handling": "Clean pulp from fleshy fruit promptly - fermenting flesh kills seed. Most need cold-moist stratification."
+    },
+    "Rhamnaceae": {
+      "cue": "Capsules turning from green to brown; a few on the plant have already popped.",
+      "collect": "Capsules explode when ripe, often within days. Bag branches or lay a sheet beneath and shake.",
+      "handling": "Dry in a paper bag - remaining capsules will fire and self-thresh. Most need heat and/or cold treatment to break dormancy."
+    },
+    "Anacardiaceae": {
+      "cue": "Drupes fully coloured and firm; on sumacs the sticky coating has developed.",
+      "collect": "Strip clusters by hand. Watch that fruit persists long after ripening - old grey fruit from last season is often still attached.",
+      "handling": "Remove the fleshy or waxy coat. Hard seed coat usually needs scarification.",
+      "caution": "Confirm identity - this family includes poison oak, whose fruit is also collected by birds and looks superficially similar at a distance."
+    },
+    "Fagaceae": {
+      "cue": "Acorn caps release cleanly and the nut is fully coloured; green acorns still tight in the cap are immature.",
+      "collect": "Collect from the ground within a day or two of drop, or pick mature acorns directly.",
+      "handling": "Float-test and discard floaters and any with weevil exit holes. Oak acorns are recalcitrant - they must not dry out. Sow promptly or refrigerate moist."
+    },
+    "Ericaceae": {
+      "cue": "Berries fully coloured and slightly soft.",
+      "collect": "Hand-pick whole berries.",
+      "handling": "Macerate and float off pulp. Most require both scarification and stratification, and are slow and unreliable from seed."
+    },
+    "Papaveraceae": {
+      "cue": "Capsule has gone from green to straw and the seed inside is dark, not pale.",
+      "collect": "Capsules dehisce explosively. Bag them, or collect the moment the first few split.",
+      "handling": "Dry fully in a paper bag; seed threshes itself as remaining capsules open."
+    },
+    "Onagraceae": {
+      "cue": "Capsules dry and beginning to split at the tip.",
+      "collect": "Strip upward into a bag before the plumed seed disperses.",
+      "handling": "Screen out the fluff. Very small seed - use a fine sieve."
+    },
+    "Polygonaceae": {
+      "cue": "Flower heads faded to rust or brown and papery; achenes dark and firm.",
+      "collect": "Rub heads between palms over a bag.",
+      "handling": "High chaff fraction is normal and mostly harmless for direct sowing.",
+      "caution": "Buckwheats hold dried flower heads for months after seed has dropped, so a brown head is not proof of full seed."
+    },
+    "Malvaceae": {
+      "cue": "Schizocarp segments brown and separating from the central axis.",
+      "collect": "Roll the disc gently between fingers - ripe segments break away.",
+      "handling": "Hard seed coat; scarify before sowing."
+    },
+    "Boraginaceae": {
+      "cue": "Coils uncurled and dry, nutlets hard.",
+      "collect": "Strip the uncurled coil into a bag.",
+      "handling": "Nutlets shed easily and are often lost to timing - check plants frequently."
+    },
+    "Apiaceae": {
+      "cue": "Umbels dry, mericarps brown and splitting into pairs.",
+      "collect": "Clip whole umbels into a bag.",
+      "handling": "Dry and rub apart.",
+      "caution": "This family includes poison hemlock and water hemlock, both lethally toxic. Do not collect from an umbellifer you have not identified with certainty."
+    },
+    "Liliaceae": {
+      "cue": "Capsule dry, brown, and beginning to split; seed black and flat.",
+      "collect": "Tip the capsule into a bag - ripe seed pours out.",
+      "handling": "Easy to clean and store. Long juvenile period - expect years to flowering."
+    },
+    "Adoxaceae": {
+      "cue": "Berries fully coloured, soft, and dropping.",
+      "collect": "Hand-pick clusters. Birds strip these fast, so the window is short.",
+      "handling": "Macerate and float off pulp within a day; fermentation kills the embryo."
+    },
+    "Grossulariaceae": {
+      "cue": "Berries fully coloured and soft.",
+      "collect": "Hand-pick.",
+      "handling": "Macerate, float off pulp, then cold-moist stratify."
+    },
+    "Convolvulaceae": {
+      "cue": "Capsules papery and brown; seed hard and dark.",
+      "collect": "Pick capsules directly.",
+      "handling": "Hard coat - scarify."
+    },
+    "Lauraceae": {
+      "cue": "Fruit turns from green to purple-brown and softens.",
+      "collect": "Pick from the tree or gather fresh drop.",
+      "handling": "Remove flesh immediately. Recalcitrant - do not let dry, sow fresh."
+    },
+    "Platanaceae": {
+      "cue": "Seed balls dry, brown, and starting to loosen into fluff.",
+      "collect": "Pick whole balls before they disintegrate.",
+      "handling": "Break apart over a bag; expect a lot of fluff and a low fill rate."
+    },
+    "Salicaceae": {
+      "cue": "Capsules splitting and cotton visible.",
+      "collect": "Collect the instant capsules open - viability is measured in days.",
+      "handling": "Sow immediately on wet mineral soil. Do not attempt to store."
+    },
+    "Cactaceae": {
+      "cue": "Fruit fully coloured and slightly yielding.",
+      "collect": "Use tongs. Glochids are the real hazard, not the spines.",
+      "handling": "Macerate, rinse, dry thoroughly."
+    }
+  },
+
+  "by_taxon": {
+    "Heteromeles arbutifolia": {
+      "cue": "Pomes fully red and slightly soft. Orange-red is still immature.",
+      "collect": "Clip whole clusters. Fruit persists well past ripeness, so late in the season check that seed inside is plump and dark, not shrivelled.",
+      "handling": "Macerate and float off pulp. Cold-moist stratify 1-3 months. Fresh seed germinates readily."
+    },
+    "Quercus agrifolia": {
+      "cue": "Acorn slips cleanly from the cap and is deep brown; the shell is hard.",
+      "collect": "Gather from the ground during the first heavy drop, before weevils and rodents work through them.",
+      "handling": "Float-test and discard floaters. Recalcitrant - never dry. Sow within weeks or store moist and cool.",
+      "caution": "Acorn crops are strongly masting; some years produce almost nothing regardless of the modelled window."
+    },
+    "Eschscholzia californica": {
+      "cue": "Long ribbed capsule turns straw-coloured and the seed inside is dark brown-black.",
+      "collect": "Capsules fire explosively and the window is only a few days per capsule. Bag developing capsules or collect daily.",
+      "handling": "Dry in a paper bag and let them self-thresh. No pretreatment needed.",
+      "caution": "This species flowers and fruits nearly year-round in mild coastal sites, so the modelled window is much wider than any single population's."
+    },
+    "Sambucus cerulea": {
+      "cue": "Berries fully blue with a waxy bloom, and soft.",
+      "collect": "Clip whole umbels. Birds strip a plant in days once ripe.",
+      "handling": "Macerate and float off pulp the same day. Warm then cold stratify."
+    },
+    "Malosma laurina": {
+      "cue": "Drupes whitish and firm on a fresh cluster.",
+      "collect": "Take only from current-season clusters - the plant holds grey, empty fruit from previous years all the way through winter and spring.",
+      "handling": "Rub off the waxy coat, then scarify.",
+      "caution": "This is the species that most badly misleads a calendar-based model. Persistent old fruit generates fruiting records year-round; judge by cluster condition, not by date."
+    },
+    "Salvia mellifera": {
+      "cue": "Calyces brown and dry; nutlets dark and hard.",
+      "collect": "Bend stalks into a bag and tap. Ripe nutlets drop instantly.",
+      "handling": "Winnow lightly. Stores well."
+    },
+    "Salvia apiana": {
+      "cue": "Flowering stalk fully dry and grey-brown; nutlets loose in the calyx.",
+      "collect": "Strip the tall wands into a bag, or clip and invert.",
+      "handling": "Screen out calyx debris."
+    },
+    "Artemisia californica": {
+      "cue": "Flowering branchlets dry and grey; tiny achenes shed at a touch.",
+      "collect": "Strip branchlets into a bag. The seed is minute - expect chaff to outweigh seed heavily.",
+      "handling": "Do not over-clean; sow with the chaff."
+    },
+    "Baccharis pilularis": {
+      "cue": "Female plants only - look for white pappus fluffing out of the heads.",
+      "collect": "Strip fluff by hand once it lifts freely.",
+      "handling": "Sow with pappus attached; separating it is more trouble than it is worth.",
+      "caution": "Dioecious. Male plants never set seed, so half the plants you find are not collectible."
+    },
+    "Eriogonum fasciculatum": {
+      "cue": "Heads rust-coloured; rubbing releases hard, dark, three-angled achenes.",
+      "collect": "Rub heads between palms over a bag and check that real seed is coming out, not just chaff.",
+      "handling": "Screening is optional for direct sowing.",
+      "caution": "Dried flower heads persist for months after the seed has already dropped. A brown head is not evidence of seed."
+    },
+    "Adenostoma fasciculatum": {
+      "cue": "Flower clusters dry to rusty brown and achenes are firm.",
+      "collect": "Strip clusters into a bag.",
+      "handling": "Very small seed with a lot of chaff. Germination is erratic without fire-related cues such as smoke or charate treatment."
+    },
+    "Rhus integrifolia": {
+      "cue": "Drupes deep red and sticky.",
+      "collect": "Strip clusters by hand.",
+      "handling": "Wash off the sticky exudate, then scarify. Slow and uneven to germinate."
+    },
+    "Prunus ilicifolia": {
+      "cue": "Drupes fully dark red to purple-black and soft.",
+      "collect": "Hand-pick. Competition from wildlife is heavy.",
+      "handling": "Clean off flesh, then cold-moist stratify. Large seed, easy to handle and high viability."
+    },
+    "Frangula californica": {
+      "cue": "Berries turn green to red to black; collect at full black and soft.",
+      "collect": "Hand-pick - fruit ripens unevenly, so expect several visits.",
+      "handling": "Macerate, float, then cold stratify."
+    },
+    "Umbellularia californica": {
+      "cue": "Fruit purple and slightly soft, often already on the ground.",
+      "collect": "Gather fresh drop.",
+      "handling": "Remove flesh at once and sow fresh - recalcitrant and short-lived."
+    },
+    "Cercocarpus betuloides": {
+      "cue": "The long feathery plume is dry and fully twisted; the achene detaches at a light touch.",
+      "collect": "Strip plumes into a bag on a still day - they carry off in any wind.",
+      "handling": "Leave plumes on. Sow shallowly."
+    },
+    "Epilobium canum": {
+      "cue": "Capsules splitting to reveal plumed seed.",
+      "collect": "Bag capsules just as the first ones open.",
+      "handling": "Fine seed - screen carefully."
+    },
+    "Arctostaphylos glauca": {
+      "cue": "Berries fully coloured and sticky-firm.",
+      "collect": "Hand-pick clusters.",
+      "handling": "Clean pulp, then scarify and treat with heat or smoke. Manzanitas are notoriously difficult from seed; propagate from cuttings if you have the option."
+    },
+    "Ceanothus": {
+      "cue": "Capsules darkening and the first few have already exploded.",
+      "collect": "Bag branch tips or lay a sheet - the window between ripe and gone can be under a week.",
+      "handling": "Dry in paper bags and let them self-thresh. Needs hot water followed by cold stratification."
+    },
+    "Paeonia californica": {
+      "cue": "Follicles leathery and splitting; seed large, glossy, and blue-black.",
+      "collect": "Open follicles by hand and tip the seed out.",
+      "handling": "Sow fresh - do not let it dry. Complex dormancy and slow to establish."
+    },
+    "Calochortus": {
+      "cue": "Capsule dry and papery, splitting along the seams; seed flat and dark.",
+      "collect": "Tip capsules into a bag.",
+      "handling": "Easy to clean and store. Expect four or more years from seed to flower.",
+      "caution": "Several Calochortus species are rare or narrowly endemic. Check status before collecting."
+    },
+    "Platanus racemosa": {
+      "cue": "Seed balls brown and beginning to fray.",
+      "collect": "Pick balls from the tree before they break up.",
+      "handling": "Break apart over a bag. Fill rate is often low - check for plump achenes."
+    },
+    "Malacothamnus": {
+      "cue": "Schizocarp segments brown and parting from the axis.",
+      "collect": "Roll discs gently between fingers.",
+      "handling": "Scarify before sowing."
+    },
+    "Comarostaphylis diversifolia": {
+      "cue": "Berries fully red and warty-firm.",
+      "collect": "Do not collect.",
+      "handling": "-",
+      "caution": "CNPS rare-plant ranked and locally restricted. Enjoy it in place; seed collection from wild populations is not appropriate."
+    }
+  }
+}
