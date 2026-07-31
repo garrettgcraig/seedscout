@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <title>SeedScout — what has collectible seed near you</title>
+<!-- Matches the Leaflet version already used elsewhere on the site. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg:#fbfaf7; --panel:#fff; --ink:#1c1f1a; --muted:#6b7263; --line:#e2e0d6;
@@ -51,6 +54,22 @@
   button.ghost{background:var(--bg);color:var(--ink);border-color:var(--line);font-weight:500}
   .chk{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--muted)}
   .chk input{width:auto;margin:0}
+
+  /* ---- map picker ---- */
+  #map{height:210px;border-radius:10px;border:1px solid var(--line);background:var(--bg);
+    z-index:0}
+  #map.dead{display:none}
+  .maprow{display:grid;gap:.4rem}
+  .coords{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;
+    font-size:.78rem;color:var(--muted)}
+  .coords b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+  .maphint{font-size:.72rem;color:var(--muted);font-style:italic}
+  .mapfail{display:none;background:var(--warn-soft);border-left:3px solid var(--warn);
+    border-radius:8px;padding:.6rem .7rem;font-size:.8rem}
+  .mapfail.on{display:block}
+  /* Leaflet's own controls need to sit above the card, but below nothing else. */
+  .leaflet-container{font:inherit}
+  .leaflet-control-attribution{font-size:.6rem}
 
   .ethics{background:var(--warn-soft);border-left:3px solid var(--warn);
     border-radius:8px;padding:.7rem .8rem;font-size:.83rem;margin-bottom:1rem}
@@ -184,9 +203,21 @@
             <option value="50">50 km</option><option value="100">100 km</option>
           </select></div>
       </div>
-      <div class="row">
-        <div><label for="lat">Latitude</label><input id="lat" type="number" step="0.001" value="34.416"></div>
-        <div><label for="lng">Longitude</label><input id="lng" type="number" step="0.001" value="-119.698"></div>
+      <div class="maprow">
+        <label>Where to look</label>
+        <div id="map"></div>
+        <div class="mapfail" id="mapfail">
+          Map unavailable offline. Use <b>Use my location</b>, or enter coordinates:
+          <div class="row" style="margin-top:.5rem">
+            <input id="lat" type="number" step="0.001" placeholder="latitude" value="34.416">
+            <input id="lng" type="number" step="0.001" placeholder="longitude" value="-119.698">
+          </div>
+        </div>
+        <div class="coords">
+          <span><b id="coordtext">34.4160, −119.6980</b></span>
+          <span id="elevtext">—</span>
+        </div>
+        <div class="maphint">Tap the map or drag the pin to move it. The circle is your search radius.</div>
       </div>
       <div>
         <label for="kind">Show</label>
@@ -196,7 +227,7 @@
         </select>
       </div>
       <label class="chk"><input type="checkbox" id="elevfilter" checked>
-        Match my elevation (<span id="elevnow">—</span>)</label>
+        Only species that grow at this elevation</label>
       <div class="row">
         <button id="locate" class="ghost">Use my location</button>
         <button id="go">Show ready seed</button>
@@ -239,16 +270,19 @@
         <div><label for="r-qty">Quantity / effort</label>
           <input id="r-qty" placeholder="e.g. 1 bag, 20 plants"></div>
       </div>
-      <div class="row">
-        <div><label for="r-lat">Latitude</label><input id="r-lat" type="number" step="0.00001"></div>
-        <div><label for="r-lng">Longitude</label><input id="r-lng" type="number" step="0.00001"></div>
+      <div>
+        <label>Where it was collected</label>
+        <div class="coords" style="margin-bottom:.45rem">
+          <span><b id="r-coordtext">not set</b></span>
+        </div>
+        <div class="row">
+          <button id="r-here" class="ghost">Use my GPS</button>
+          <button id="r-frommap" class="ghost">Use map pin</button>
+        </div>
       </div>
       <div><label for="r-notes">Notes</label>
         <textarea id="r-notes" placeholder="Ripeness, population size, permission, habitat…"></textarea></div>
-      <div class="row">
-        <button id="r-here" class="ghost">Use my GPS</button>
-        <button id="r-save">Save record</button>
-      </div>
+      <button id="r-save">Save record</button>
     </div>
 
     <div class="ethics">
@@ -289,6 +323,10 @@ const WIDE_WINDOW = 100, USELESS_WINDOW = 200;
 let MODEL = null, INDEX = new Map(), BY_ID = new Map(), USER_ELEV = null;
 
 const FAMILY_HUE = new Map();
+// Single source of truth for the search location. The map, the geolocation
+// button and the offline coordinate fallback all write here.
+let POS = {lat: 34.416, lng: -119.698};
+let MAP = null, PIN = null, RING = null, TILES = null, ELEV_TIMER = null;
 const $ = id => document.getElementById(id);
 
 // Spread families around the hue circle by golden angle rather than hashing, so
@@ -366,20 +404,91 @@ async function load(){
   $('taxalist').innerHTML = MODEL.taxa
     .map(t => `<option value="${esc(t.name)}">${esc(t.common || '')}</option>`).join('');
   $('date').value = $('r-date').value = new Date().toISOString().slice(0,10);
-  lookupElevation();
-  run(); renderLog();
+  initMap();
+  refreshPosition();
+  renderLog();
+}
+
+/* ---------- map picker ---------- */
+const CARTO = dark =>
+  `https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`;
+const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+
+function initMap(){
+  // A field tool has to survive having no network. If Leaflet did not load,
+  // fall back to the geolocation button plus manual coordinate entry.
+  if (typeof L === 'undefined'){
+    $('map').classList.add('dead');
+    $('mapfail').classList.add('on');
+    for (const id of ['lat','lng']) $(id).onchange = () => {
+      POS = {lat: +$('lat').value, lng: +$('lng').value};
+      refreshPosition();
+    };
+    return;
+  }
+  MAP = L.map('map', {zoomControl: true, attributionControl: true})
+         .setView([POS.lat, POS.lng], 10);
+  TILES = L.tileLayer(CARTO(prefersDark()), {
+    maxZoom: 19, attribution: '&copy; <a href="https://carto.com/">CARTO</a>, OpenStreetMap',
+  }).addTo(MAP);
+
+  PIN = L.marker([POS.lat, POS.lng], {draggable: true, autoPan: true}).addTo(MAP);
+  RING = L.circle([POS.lat, POS.lng], {
+    radius: +$('radius').value * 1000, weight: 1,
+    color: '#3f6b2e', fillColor: '#3f6b2e', fillOpacity: .08,
+  }).addTo(MAP);
+
+  const moved = latlng => {
+    POS = {lat: +latlng.lat.toFixed(5), lng: +latlng.lng.toFixed(5)};
+    PIN.setLatLng(latlng); RING.setLatLng(latlng);
+    refreshPosition();
+  };
+  MAP.on('click', e => moved(e.latlng));
+  PIN.on('dragend', () => moved(PIN.getLatLng()));
+
+  // Follow the OS theme so the basemap never fights the page.
+  matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => TILES.setUrl(CARTO(prefersDark())));
+  fitRing();
+}
+
+function fitRing(){
+  if (!MAP || !RING) return;
+  MAP.fitBounds(RING.getBounds(), {padding: [12, 12]});
+}
+
+function setPosition(lat, lng, zoom){
+  POS = {lat: +(+lat).toFixed(5), lng: +(+lng).toFixed(5)};
+  if (MAP){
+    PIN.setLatLng([POS.lat, POS.lng]);
+    RING.setLatLng([POS.lat, POS.lng]);
+    MAP.setView([POS.lat, POS.lng], zoom ?? MAP.getZoom());
+  } else {
+    $('lat').value = POS.lat; $('lng').value = POS.lng;
+  }
+  refreshPosition();
+}
+
+// Called on every pin move: cheap work now, the elevation request debounced.
+function refreshPosition(){
+  $('coordtext').textContent =
+    `${POS.lat.toFixed(4)}, ${POS.lng.toFixed(4)}`.replace(/-/g, '−');
+  run();
+  clearTimeout(ELEV_TIMER);
+  ELEV_TIMER = setTimeout(lookupElevation, 350);
 }
 
 // Elevation for the query point. Failure is non-fatal: the filter just turns off.
 async function lookupElevation(){
-  const lat = +$('lat').value, lng = +$('lng').value;
+  $('elevtext').textContent = 'elevation…';
   try {
-    const r = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
+    const r = await fetch(
+      `https://api.open-meteo.com/v1/elevation?latitude=${POS.lat}&longitude=${POS.lng}`);
     USER_ELEV = (await r.json()).elevation[0];
-    $('elevnow').textContent = `${Math.round(USER_ELEV)} m`;
+    $('elevtext').textContent = `${Math.round(USER_ELEV)} m`;
   } catch {
     USER_ELEV = null;
-    $('elevnow').textContent = 'unavailable';
+    $('elevtext').textContent = 'elevation unavailable';
     $('elevfilter').checked = false;
   }
   run();
@@ -450,7 +559,7 @@ function card(t, local, c, today){
   const btn = detail.querySelector('.logbtn');
   if (btn) btn.onclick = () => {
     $('r-species').value = t.name;
-    $('r-lat').value = $('lat').value; $('r-lng').value = $('lng').value;
+    setRecPos(POS.lat, POS.lng);
     showTab('log'); window.scrollTo({top:0, behavior:'smooth'});
   };
   return el;
@@ -482,7 +591,7 @@ function detailHTML(t){
 
 function run(){
   if (!MODEL) return;
-  const lat = +$('lat').value, lng = +$('lng').value, km = +$('radius').value;
+  const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';
   const useElev = $('elevfilter').checked && USER_ELEV != null;
@@ -737,6 +846,14 @@ function renderLog(){
   }
 }
 
+// Pending location for the record form, set by GPS or copied from the map pin.
+let REC_POS = null;
+function setRecPos(lat, lng){
+  REC_POS = {lat: +(+lat).toFixed(5), lng: +(+lng).toFixed(5)};
+  $('r-coordtext').textContent =
+    `${REC_POS.lat.toFixed(5)}, ${REC_POS.lng.toFixed(5)}`.replace(/-/g, '−');
+}
+
 $('r-save').onclick = () => {
   const species = $('r-species').value.trim();
   if (!species) return alert('Which species?');
@@ -748,14 +865,15 @@ $('r-save').onclick = () => {
     common: match ? match.common : null,
     taxon_id: match ? match.taxon_id : null,
     date: $('r-date').value || new Date().toISOString().slice(0,10),
-    lat: $('r-lat').value === '' ? null : +$('r-lat').value,
-    lng: $('r-lng').value === '' ? null : +$('r-lng').value,
+    lat: REC_POS ? REC_POS.lat : null,
+    lng: REC_POS ? REC_POS.lng : null,
     elev: null,
     qty: $('r-qty').value.trim() || null,
     notes: $('r-notes').value.trim() || null,
   };
   saveRecords([...records(), rec]);
   for (const id of ['r-species','r-qty','r-notes']) $(id).value = '';
+  REC_POS = null; $('r-coordtext').textContent = 'not set';
   renderLog();
   if (rec.lat != null) fetch(
     `https://api.open-meteo.com/v1/elevation?latitude=${rec.lat}&longitude=${rec.lng}`)
@@ -768,12 +886,12 @@ $('r-save').onclick = () => {
 $('r-here').onclick = () => {
   $('r-here').textContent = 'Locating…';
   navigator.geolocation.getCurrentPosition(
-    p => { $('r-lat').value = p.coords.latitude.toFixed(5);
-           $('r-lng').value = p.coords.longitude.toFixed(5);
+    p => { setRecPos(p.coords.latitude, p.coords.longitude);
            $('r-here').textContent = 'Use my GPS'; },
     () => { $('r-here').textContent = 'GPS unavailable'; },
     {enableHighAccuracy:true, timeout:15000});
 };
+$('r-frommap').onclick = () => setRecPos(POS.lat, POS.lng);
 
 function download(name, text, type){
   const a = document.createElement('a');
@@ -822,14 +940,18 @@ $('tab-find').onclick = () => showTab('find');
 $('tab-log').onclick = () => { showTab('log'); renderLog(); };
 
 $('go').onclick = run;
-for (const id of ['date','radius','kind','elevfilter']) $(id).onchange = run;
-for (const id of ['lat','lng']) $(id).onchange = lookupElevation;
+for (const id of ['date','kind','elevfilter']) $(id).onchange = run;
+$('radius').onchange = () => {
+  if (RING) RING.setRadius(+$('radius').value * 1000);
+  fitRing();
+  run();
+};
 $('locate').onclick = () => {
   $('locate').textContent = 'Locating…';
   navigator.geolocation.getCurrentPosition(
-    p => { $('lat').value = p.coords.latitude.toFixed(3);
-           $('lng').value = p.coords.longitude.toFixed(3);
-           $('locate').textContent = 'Use my location'; lookupElevation(); },
+    p => { setPosition(p.coords.latitude, p.coords.longitude, 12);
+           fitRing();
+           $('locate').textContent = 'Use my location'; },
     () => { $('locate').textContent = 'Location unavailable'; },
     {enableHighAccuracy:false, timeout:10000});
 };
