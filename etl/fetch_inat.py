@@ -146,8 +146,14 @@ def fetch(bbox: dict, out_path: Path, resume: bool = True) -> int:
 REGIONS = {
     # Fast pilot: Santa Barbara + Ventura counties.
     "sbv": dict(swlat=34.0, nelat=35.1, swlng=-120.8, nelng=-118.9),
-    # Full v1 region: coastal Southern California, Point Conception to the border.
+    # Coastal Southern California, Point Conception to the border.
     "socal": dict(swlat=32.5, nelat=35.1, swlng=-120.8, nelng=-116.5),
+    # National build. CONUS is ~6.3M annotated observations and takes the better
+    # part of a day to page through; the run is resumable, so re-invoking it
+    # after an interruption picks up from the last observation id.
+    "conus": dict(swlat=24.4, nelat=49.4, swlng=-125.0, nelng=-66.9),
+    "alaska": dict(swlat=51.0, nelat=71.5, swlng=-180.0, nelng=-129.0),
+    "hawaii": dict(swlat=18.8, nelat=22.3, swlng=-160.3, nelng=-154.7),
 }
 
 

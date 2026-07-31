@@ -439,7 +439,7 @@ function timeline(t, today){
 
 /* ---------- data ---------- */
 async function load(){
-  MODEL = await (await fetch('species_sbv.json')).json();
+  MODEL = await (await fetch('species_socal.json')).json();
   assignFamilyHues(MODEL.taxa);
   for (const t of MODEL.taxa){
     BY_ID.set(t.taxon_id, t);
