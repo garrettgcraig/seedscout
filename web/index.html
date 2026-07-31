@@ -220,6 +220,11 @@
   <!-- ============ FIND ============ -->
   <section id="pane-find">
     <div class="controls">
+      <div>
+        <label for="search">Find a specific plant</label>
+        <input id="search" type="search" autocomplete="off" list="taxalist"
+               placeholder="Toyon, Salvia, Quercus agrifolia…">
+      </div>
       <div class="row">
         <div><label for="date">Date</label><input type="date" id="date"></div>
         <div><label for="radius">Within</label>
@@ -580,7 +585,9 @@ function card(t, local, c, today){
   if (t.sensitive) tags.push(['bad', 'rare — do not collect']);
   if (t.establishment === 'introduced') tags.push(['grey', 'non-native']);
   if (t.family) tags.push(['fam', t.family, `--h:${FAMILY_HUE.get(t.family) ?? 0}`]);
-  tags.push([local >= 8 ? '' : 'grey', `${local} record${local===1?'':'s'} nearby`]);
+  tags.push(local > 0
+    ? [local >= 8 ? '' : 'grey', `${local} record${local === 1 ? '' : 's'} nearby`]
+    : ['warn', `not recorded within ${$('radius').value} km`]);
   if (t.elevation) tags.push(['grey', `${t.elevation.lo}–${t.elevation.hi} m`]);
   if (t.confidence < 0.5) tags.push(['warn', `low confidence · n=${t.n_fruit}`]);
   if (t.persistence > 0.3) tags.push(['warn', 'fruit persists — may read late']);
@@ -638,15 +645,59 @@ function detailHTML(t){
     <button class="logbtn ghost">Log a collection of this species</button>`;
 }
 
+function renderSearch(query, totals, today){
+  const localOf = new Map([...totals].map(([t, n]) => [t.taxon_id, n]));
+  const hit = t => {
+    const sci = t.name.toLowerCase(), com = (t.common || '').toLowerCase();
+    if (!sci.includes(query) && !com.includes(query)) return null;
+    // Rank exact and prefix matches above mid-word ones, then by how well the
+    // species is sampled.
+    const rank = sci === query || com === query ? 0
+               : sci.startsWith(query) || com.startsWith(query) ? 1
+               : 2;
+    return {t, rank};
+  };
+  const matches = MODEL.taxa.map(hit).filter(Boolean)
+    .sort((a, b) => a.rank - b.rank || b.t.n_fruit - a.t.n_fruit)
+    .slice(0, 30);
+
+  const out = $('out');
+  out.innerHTML = '';
+  if (!matches.length){
+    out.innerHTML = `<div class="empty">Nothing matching “${esc(query)}”.
+      Try a genus (<em>Salvia</em>) or a common name (<em>toyon</em>). The model only
+      covers species with enough fruiting records to fit a window.</div>`;
+    return;
+  }
+
+  const h = document.createElement('div');
+  h.className = 'group';
+  h.innerHTML = `<h2>Matching “${esc(query)}”</h2><span class="n">${matches.length}</span>`;
+  out.append(h);
+
+  for (const {t} of matches){
+    const c = classify(t, today);
+    out.append(card(t, localOf.get(t.taxon_id) || 0, c, today));
+  }
+}
+
 function run(){
   if (!MODEL) return;
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';
   const useElev = $('elevfilter').checked && USER_ELEV != null;
+  const totals = nearby(lat, lng, km);
+
+  // Searching is an explicit request for one plant, so it deliberately ignores
+  // the natives, elevation, and season filters: the answer to "when is toyon
+  // ready" should not be "no results" just because it is July.
+  const query = $('search').value.trim().toLowerCase();
+  if (query){ renderSearch(query, totals, today); return; }
+
   const buckets = {now:[], soon:[], past:[]};
 
-  for (const [t, local] of nearby(lat, lng, km)){
+  for (const [t, local] of totals){
     if (nativesOnly && t.establishment === 'introduced') continue;
     // Elevation is used for presence, not timing: a montane species inside the
     // radius is still not growing at the coast. Margin is generous because the
@@ -1278,6 +1329,13 @@ $('tab-log').onclick = () => { showTab('log'); renderLog(); };
 
 $('go').onclick = run;
 for (const id of ['date','kind','elevfilter']) $(id).onchange = run;
+// Search as you type, lightly debounced so a 1,000-species scan does not run on
+// every keystroke.
+let SEARCH_TIMER = null;
+$('search').addEventListener('input', () => {
+  clearTimeout(SEARCH_TIMER);
+  SEARCH_TIMER = setTimeout(run, 160);
+});
 $('radius').onchange = () => {
   if (RING) RING.setRadius(+$('radius').value * 1000);
   fitRing();
