@@ -59,6 +59,12 @@ flowering peak already absorbs the effect, and a lapse term would double-count i
   and 9% exceed 200. These are fits that failed rather than long seasons, typically species that
   flower near year-round so the flowering anchor carries no information. The client tags the former
   and drops the latter.
+- **One window is fitted per species for the whole region, and that over-pools.** Splitting the
+  current region at Los Angeles and fitting north and south separately, 50% of well-sampled species
+  disagree by more than 14 days and 21% by more than 30. *Larrea tridentata* peaks in June in the
+  Mojave and November in the southern deserts — 165 days apart — while the pooled fit reports late
+  June and is simply wrong for southern populations. Species whose range spans a strong climate
+  gradient should be read with this in mind; fitting per sub-region is the fix.
 - **Windows are climatological averages.** There is no year-to-year adjustment, so a hot or late
   season shifts real phenology in ways the model will not see.
 - **Observation density follows people, not plants.** Roadsides and popular trails are heavily
@@ -189,6 +195,13 @@ confidence in the estimate.
 
 ## Roadmap
 
+- **National coverage.** `conus`, `alaska`, and `hawaii` regions are defined in the ETL. CONUS is
+  ~6.3 million annotated observations, roughly nine hours of paging; the fetch is resumable, so
+  re-running the same command after an interruption continues from the last observation id.
+  Reaching national scale needs two changes beyond a wider bounding box: phenology fitted per
+  species *per sub-region* rather than pooled (see Known limits), and the model emitted as spatial
+  tiles with the client loading only nearby ones, since a single national payload would be tens of
+  megabytes.
 - **Ground-truth calibration.** Export the record CSV and refit `RIPE_QUANTILES` against
   `days_from_peak`, ideally per fruit type. Fleshy, dry-dehiscent, and dry-persistent almost
   certainly want different values; family is already in the payload as a rough proxy.
