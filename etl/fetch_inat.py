@@ -19,27 +19,55 @@ from pathlib import Path
 
 API = "https://api.inaturalist.org/v1/observations"
 PER_PAGE = 200
-# Be a good citizen: iNat asks for <=60 requests/min and a real user agent.
+# iNat asks for <=60 requests/min and a real user agent. Pacing exactly at that
+# limit still trips their throttle on a long run, and each 429 costs more in
+# backoff than the pacing would have cost in the first place, so the interval
+# adapts: it climbs on throttling and eases back down after a clean streak.
 MIN_INTERVAL = 1.05
+MAX_INTERVAL = 6.0
+CLEAN_STREAK = 40          # successes before easing the pace back down
 USER_AGENT = "seedscout/0.1 (native seed collection timing; contact via github)"
+
+_pace = {"interval": MIN_INTERVAL, "clean": 0, "throttled": 0}
 
 # Controlled term 12 = "Flowers and Fruits"
 TERM_FLOWERS_FRUITS = 12
 VALUE_LABELS = {13: "flowers", 14: "fruits", 15: "flower_buds", 21: "none"}
 
 
-def get(url: str, tries: int = 5) -> dict:
-    """GET with exponential backoff. iNat returns 429/503 under load."""
+def get(url: str, tries: int = 6) -> dict:
+    """GET with adaptive pacing and exponential backoff.
+
+    A 429 is treated as a signal to slow down permanently rather than just a
+    reason to sleep once: throttling one page usually means the next page would
+    be throttled too. Retry-After is honoured when the server sends it.
+    """
     for attempt in range(tries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                _pace["clean"] += 1
+                if _pace["clean"] >= CLEAN_STREAK and _pace["interval"] > MIN_INTERVAL:
+                    _pace["interval"] = max(MIN_INTERVAL, _pace["interval"] * 0.85)
+                    _pace["clean"] = 0
                 return json.load(resp)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
             if attempt == tries - 1:
                 raise
-            wait = 2**attempt * 2
-            print(f"  retry in {wait}s ({exc})", file=sys.stderr)
+            _pace["clean"] = 0
+            throttled = isinstance(exc, urllib.error.HTTPError) and exc.code in (429, 503)
+            if throttled:
+                _pace["throttled"] += 1
+                _pace["interval"] = min(MAX_INTERVAL, _pace["interval"] * 1.4)
+            retry_after = 0
+            if isinstance(exc, urllib.error.HTTPError):
+                try:
+                    retry_after = float(exc.headers.get("Retry-After") or 0)
+                except ValueError:
+                    retry_after = 0
+            wait = max(retry_after, 2 ** attempt * 2)
+            print(f"  retry in {wait:.0f}s, pace now {_pace['interval']:.2f}s ({exc})",
+                  file=sys.stderr, flush=True)
             time.sleep(wait)
     raise RuntimeError("unreachable")
 
@@ -131,13 +159,15 @@ def fetch(bbox: dict, out_path: Path, resume: bool = True) -> int:
             seen += len(results)
             id_above = results[-1]["id"]
             state_path.write_text(json.dumps({"id_above": id_above, "written": written}))
-            print(f"\r  {seen:,}/{total:,} scanned, {written:,} kept", end="", flush=True)
+            print(f"\r  {seen:,}/{total:,} scanned, {written:,} kept, "
+                  f"pace {_pace['interval']:.2f}s, {_pace['throttled']} throttled",
+                  end="", flush=True)
 
             if len(results) < PER_PAGE:
                 break
             elapsed = time.monotonic() - started
-            if elapsed < MIN_INTERVAL:
-                time.sleep(MIN_INTERVAL - elapsed)
+            if elapsed < _pace["interval"]:
+                time.sleep(_pace["interval"] - elapsed)
 
     print(f"\ndone: {written:,} rows -> {out_path}")
     return written
