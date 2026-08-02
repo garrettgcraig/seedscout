@@ -60,6 +60,27 @@
     z-index:0}
   #map.dead{display:none}
   .maprow{display:grid;gap:.4rem}
+  .placewrap{position:relative}
+  .places{position:absolute;top:calc(100% + .25rem);left:0;right:0;z-index:600;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    box-shadow:0 8px 24px rgba(0,0,0,.14)}
+  @media (prefers-color-scheme:dark){.places{box-shadow:0 8px 24px rgba(0,0,0,.5)}}
+  .places button{display:block;width:100%;text-align:left;background:none;border:0;
+    border-bottom:1px solid var(--line);border-radius:0;padding:.55rem .7rem;font-weight:500;
+    color:var(--ink);cursor:pointer;font-size:.87rem;line-height:1.3}
+  .places button:last-child{border-bottom:0}
+  .places button:hover,.places button:focus{background:var(--accent-soft);outline:none}
+  .places button small{display:block;color:var(--muted);font-size:.72rem;margin-top:.1rem}
+  .places .none{padding:.55rem .7rem;color:var(--muted);font-size:.83rem;font-style:italic}
+
+  /* Crosshair control, drawn to match Leaflet's own zoom buttons. */
+  .locbtn{width:34px;height:34px;display:grid;place-items:center;cursor:pointer;
+    background:var(--panel);color:var(--ink)}
+  .locbtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.9}
+  .locbtn.busy{color:var(--muted)}
+  .locbtn.busy svg{animation:spin 1.1s linear infinite}
+  .locbtn.err{color:var(--alert)}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .coords{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;
     font-size:.78rem;color:var(--muted)}
   .coords b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
@@ -234,10 +255,14 @@
           </select></div>
       </div>
       <div class="maprow">
-        <label>Where to look</label>
+        <label for="place">Where to look</label>
+        <div class="placewrap">
+          <input id="place" type="search" autocomplete="off" placeholder="City, park, or address…">
+          <div class="places" id="places" hidden></div>
+        </div>
         <div id="map"></div>
         <div class="mapfail" id="mapfail">
-          Map unavailable offline. Use <b>Use my location</b>, or enter coordinates:
+          Map unavailable offline. Search above, or enter coordinates:
           <div class="row" style="margin-top:.5rem">
             <input id="lat" type="number" step="0.001" placeholder="latitude" value="34.416">
             <input id="lng" type="number" step="0.001" placeholder="longitude" value="-119.698">
@@ -247,7 +272,7 @@
           <span><b id="coordtext">34.4160, −119.6980</b></span>
           <span id="elevtext">—</span>
         </div>
-        <div class="maphint">Tap the map or drag the pin to move it. The circle is your search radius.</div>
+        <div class="maphint">Search a place, tap the map, or drag the pin. The crosshair finds you.</div>
       </div>
       <div>
         <label for="kind">Show</label>
@@ -258,10 +283,7 @@
       </div>
       <label class="chk"><input type="checkbox" id="elevfilter" checked>
         Only species that grow at this elevation</label>
-      <div class="row">
-        <button id="locate" class="ghost">Use my location</button>
-        <button id="go">Show ready seed</button>
-      </div>
+      <button id="go">Show ready seed</button>
     </div>
 
     <div class="ethics">
@@ -565,6 +587,25 @@ function initMap(){
   };
   MAP.on('click', e => moved(e.latlng));
   PIN.on('dragend', () => moved(PIN.getLatLng()));
+
+  // Locate control, sitting on the map under the zoom buttons where a crosshair
+  // is conventionally found, rather than as a separate button in the form.
+  const Locate = L.Control.extend({
+    options: {position: 'topleft'},
+    onAdd(){
+      const wrap = L.DomUtil.create('div', 'leaflet-bar');
+      const btn = L.DomUtil.create('a', 'locbtn', wrap);
+      btn.href = '#';
+      btn.title = btn.setAttribute('aria-label', 'Find my location') || 'Find my location';
+      btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="6.2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/>
+        <path d="M12 1.6v3.2M12 19.2v3.2M22.4 12h-3.2M4.8 12H1.6" stroke-linecap="round"/></svg>`;
+      L.DomEvent.disableClickPropagation(wrap);
+      L.DomEvent.on(btn, 'click', L.DomEvent.preventDefault).on(btn, 'click', () => locateMe(btn));
+      return wrap;
+    },
+  });
+  MAP.addControl(new Locate());
 
   // Follow the OS theme so the basemap never fights the page.
   matchMedia('(prefers-color-scheme: dark)')
@@ -1429,15 +1470,89 @@ $('radius').onchange = async () => {
   await ensureTiles(POS.lat, POS.lng, +$('radius').value);
   run();
 };
-$('locate').onclick = () => {
-  $('locate').textContent = 'Locating…';
+function locateMe(btn){
+  if (!navigator.geolocation) return;
+  btn.classList.remove('err');
+  btn.classList.add('busy');
   navigator.geolocation.getCurrentPosition(
-    p => { setPosition(p.coords.latitude, p.coords.longitude, 12);
-           fitRing();
-           $('locate').textContent = 'Use my location'; },
-    () => { $('locate').textContent = 'Location unavailable'; },
-    {enableHighAccuracy:false, timeout:10000});
-};
+    p => {
+      btn.classList.remove('busy');
+      setPosition(p.coords.latitude, p.coords.longitude, 12);
+      fitRing();
+    },
+    err => {
+      // Denied or unavailable. Say so on the control itself and leave the pin
+      // alone; the search box is the way out.
+      btn.classList.remove('busy');
+      btn.classList.add('err');
+      btn.title = err.code === err.PERMISSION_DENIED
+        ? 'Location permission denied — search for a place instead'
+        : 'Location unavailable — search for a place instead';
+      setTimeout(() => btn.classList.remove('err'), 4000);
+    },
+    {enableHighAccuracy: false, timeout: 10000, maximumAge: 60000});
+}
+
+/* ---------- place search ----------
+   Nominatim, matching the OpenStreetMap data behind the basemap. Their usage
+   policy asks for at most one request a second, hence the debounce, and results
+   are limited to the US because the model only covers the lower 48. */
+let PLACE_TIMER = null, PLACE_SEQ = 0;
+
+function hidePlaces(){ $('places').hidden = true; $('places').innerHTML = ''; }
+
+function showPlaces(items){
+  const box = $('places');
+  if (!items) { hidePlaces(); return; }
+  box.hidden = false;
+  if (!items.length){ box.innerHTML = '<div class="none">No matching place</div>'; return; }
+  box.innerHTML = '';
+  for (const it of items){
+    const b = document.createElement('button');
+    const [head, ...rest] = it.display_name.split(', ');
+    b.innerHTML = `${esc(head)}<small>${esc(rest.join(', '))}</small>`;
+    b.onclick = () => {
+      $('place').value = head;
+      hidePlaces();
+      setPosition(+it.lat, +it.lon, 11);
+      fitRing();
+    };
+    box.append(b);
+  }
+}
+
+async function searchPlace(q){
+  const seq = ++PLACE_SEQ;
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5'
+              + '&countrycodes=us&q=' + encodeURIComponent(q);
+    const res = await fetch(url, {headers: {'Accept': 'application/json'}});
+    const items = await res.json();
+    if (seq === PLACE_SEQ) showPlaces(items);          // ignore stale responses
+  } catch {
+    if (seq === PLACE_SEQ) showPlaces([]);
+  }
+}
+
+$('place').addEventListener('input', () => {
+  const q = $('place').value.trim();
+  clearTimeout(PLACE_TIMER);
+  if (q.length < 3) { hidePlaces(); return; }
+  PLACE_TIMER = setTimeout(() => searchPlace(q), 450);
+});
+$('place').addEventListener('keydown', e => {
+  if (e.key === 'Enter'){
+    e.preventDefault();
+    clearTimeout(PLACE_TIMER);
+    const first = $('places').querySelector('button');
+    if (first) first.click();
+    else if ($('place').value.trim().length >= 3) searchPlace($('place').value.trim());
+  } else if (e.key === 'Escape') hidePlaces();
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('.placewrap')) hidePlaces();
+});
+
 load();
 </script>
 </body>

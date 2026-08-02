@@ -134,8 +134,9 @@ A single HTML file plus a directory of JSON tiles. No build step, no framework, 
 client loads only the tiles its search circle touches — one for a 25 km search, four when a 100 km
 radius straddles tile boundaries.
 
-- **Find seed** — set a location by tapping the map, dragging the pin, or using device geolocation;
-  the search radius is drawn as a circle. Species are grouped into *collectible now*, *coming up*,
+- **Find seed** — set a location by name (city, park, or address), by tapping the map, by dragging
+  the pin, or with the crosshair control that uses device geolocation; the search radius is drawn
+  as a circle. Species are grouped into *collectible now*, *coming up*,
   and *just missed*, ranked by proximity to the modelled peak, local abundance, and confidence.
 - **Timeline** — every species shows a full-year bar: flowering period, fruiting period, ripe
   window, and the selected date.
@@ -147,7 +148,8 @@ radius straddles tile boundaries.
   *do not collect* and down-ranked; the 30-plants / 30%-of-seed rule and permit requirements are
   stated up front.
 
-Leaflet and CARTO basemaps are loaded from a CDN for the map. If they are unavailable, the map is
+Leaflet and CARTO basemaps are loaded from a CDN for the map, and place search uses Nominatim,
+matching the OpenStreetMap data behind the basemap; queries are debounced and limited to the US. If they are unavailable, the map is
 replaced by manual coordinate entry and everything else works unchanged.
 
 ## Records and propagation
