@@ -1,1 +1,35 @@
 === waiting for establishment_tiles ===
+  finished
+=== lifting per-tile establishment into sidecar ===
+  310 tiles, 36,137 labels -> establishment_tiles_conus.json
+=== taxa detail: family, status, photo ===
+3,790 taxa, 127 requests
+  30/3,790  60/3,790  90/3,790  120/3,790  150/3,790  180/3,790  210/3,790  240/3,790  270/3,790  300/3,790  330/3,790  360/3,790  390/3,790  420/3,790  450/3,790  480/3,790  510/3,790  540/3,790  570/3,790  600/3,790  630/3,790  660/3,790  690/3,790  720/3,790  750/3,790  780/3,790  810/3,790  840/3,790  870/3,790  900/3,790  930/3,790  960/3,790  990/3,790  1,020/3,790  1,050/3,790  1,080/3,790  1,110/3,790  1,140/3,790  1,170/3,790  1,200/3,790  1,230/3,790  1,260/3,790  1,290/3,790  1,320/3,790  1,350/3,790  1,380/3,790  1,410/3,790  1,440/3,790  1,470/3,790  1,500/3,790  1,530/3,790  1,560/3,790  1,590/3,790  1,620/3,790  1,650/3,790  1,680/3,790  1,710/3,790  1,740/3,790  1,770/3,790  1,800/3,790  1,830/3,790  1,860/3,790  1,890/3,790  1,920/3,790  1,950/3,790  1,980/3,790  2,010/3,790  2,040/3,790  2,070/3,790  2,100/3,790  2,130/3,790  2,160/3,790  2,190/3,790  2,220/3,790  2,250/3,790  2,280/3,790  2,310/3,790  2,340/3,790  2,370/3,790  2,400/3,790  2,430/3,790  2,460/3,790  2,490/3,790  2,520/3,790  2,550/3,790  2,580/3,790  2,610/3,790  2,640/3,790  2,670/3,790  2,700/3,790  2,730/3,790  2,760/3,790  2,790/3,790  2,820/3,790  2,850/3,790  2,880/3,790  2,910/3,790  2,940/3,790  2,970/3,790  3,000/3,790  3,030/3,790  3,060/3,790  3,090/3,790  3,120/3,790  3,150/3,790  3,180/3,790  3,210/3,790
+  retry in 3s (HTTP Error 429: normal_throttling)
+  3,240/3,790
+  retry in 3s (HTTP Error 429: normal_throttling)
+  3,270/3,790  3,300/3,790  3,330/3,790  3,360/3,790  3,390/3,790  3,420/3,790
+  retry in 3s (HTTP Error 429: normal_throttling)
+  3,450/3,790  3,480/3,790  3,510/3,790  3,540/3,790  3,570/3,790  3,600/3,790
+  retry in 3s (HTTP Error 429: normal_throttling)
+  3,630/3,790  3,660/3,790  3,690/3,790  3,720/3,790
+  retry in 3s (HTTP Error 429: normal_throttling)
+  3,750/3,790  3,780/3,790  3,790/3,790
+done: 3,790 taxa detailed
+  family 3,850 | photos 3,183 | tips 2,195 | sensitive 263
+rebuild tiles to pick this up
+=== rebuilding tiles ===
+sources: obs_conus.jsonl, obs_socal.jsonl
+  read 500,000  read 1,000,000  read 1,500,000  read 2,000,000  read 2,010,328 unique observations (126,830 duplicates skipped) -> 150,528 (taxon, tile) pairs
+  merging enrichment for 13,509 taxa
+  merging per-tile establishment for 310 tiles
+
+310 tiles, 41,707 species-tile fits, 39.1 MB total
+  fit levels: {'cell': 3585, 'block': 26338, 'area': 7947, 'wide': 3837}
+  largest tile: 16_-59.json with 1,118 species (1.29 MB)
+=== coverage after ===
+Santa Barbara    804 species | photos  777 ( 97%) | tips  519 ( 65%)
+Boston           430 species | photos  345 ( 80%) | tips  206 ( 48%)
+Austin           367 species | photos  288 ( 78%) | tips  159 ( 43%)
+Seattle          256 species | photos  207 ( 81%) | tips  140 ( 55%)
+=== done, ready to deploy ===
