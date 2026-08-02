@@ -197,6 +197,8 @@
   .attention b{color:var(--warn)}
   .attention .line{display:flex;justify-content:space-between;gap:.6rem}
   .attention .line.late b{color:var(--alert)}
+  /* What the deadline actually is, under the countdown it belongs to. */
+  .attention .sub{font-size:.72rem;color:var(--muted);margin:-.18rem 0 .18rem}
   .empty{color:var(--muted);font-size:.88rem;padding:.9rem;text-align:center;
     border:1px dashed var(--line);border-radius:var(--radius)}
   footer{max-width:820px;margin:2.5rem auto 0;padding:1rem 1.1rem;color:var(--muted);
@@ -330,6 +332,15 @@
       Records are stored <b>only in this browser</b> (localStorage) — they are never uploaded.
       Export regularly to keep them. Logged dates are compared against the modelled window, which
       is exactly the ground truth needed to recalibrate it.
+    </div>
+
+    <div class="controls" id="zonebox">
+      <div class="row">
+        <div><label for="zone">Your planting zone</label><select id="zone"></select></div>
+        <div><label for="zone-detect">Or measure it</label>
+          <button id="zone-detect" class="ghost">From the map pin</button></div>
+      </div>
+      <div class="hint" id="zonereadout"></div>
     </div>
 
     <div id="attention"></div>
@@ -524,6 +535,7 @@ async function load(){
   TILE_INDEX = await (await fetch(`${TILE_ROOT}/index.json`)).json();
   MODEL = TILE_INDEX;
   $('date').value = $('r-date').value = new Date().toISOString().slice(0,10);
+  loadZone(); renderZone();
   initMap();
   await refreshPosition();
   renderLog();
@@ -807,9 +819,19 @@ function run(){
 
   const out = $('out'); out.innerHTML = '';
   const titles = {now:'Collectible now', soon:'Coming up (next 6 weeks)', past:'Just missed'};
+  // "Coming up" is a calendar, not a ranking: it reads soonest first, so the next
+  // thing to go and watch is at the top and the order matches the "in ~N d" the
+  // cards show. Score only breaks ties between species opening the same day.
+  // The other two groups stay ranked, since "collectible now" is a question of
+  // which to visit today, not of what happens next.
+  const order = {
+    now:  (a, b) => b.score - a.score,
+    soon: (a, b) => a.c.until - b.c.until || b.score - a.score,
+    past: (a, b) => b.score - a.score,
+  };
   let any = false;
   for (const k of ['now','soon','past']){
-    const list = buckets[k].sort((a,b) => b.score - a.score);
+    const list = buckets[k].sort(order[k]);
     if (!list.length) continue;
     any = true;
     const h = document.createElement('div');
@@ -1043,7 +1065,229 @@ function lifecycle(rec){
                        cls: out.rate >= 0.2 ? 'done' : 'late'});
     }
   }
+  if (p.planted?.date) out.stages.push({label: `planted out ${p.planted.date}`, cls: 'done'});
   return out;
+}
+
+/* ---------- planting zone ----------
+   Sowing and planting out are timed off frost, not off the collection date. The
+   USDA zone is the input people actually know, so it is what the app asks for —
+   but a zone is defined by average annual extreme minimum temperature, which is
+   only loosely related to frost timing. The table below is the conventional
+   translation, and it is a national average: one zone band runs coast to
+   interior, so the same zone can differ by a month either side. Everything
+   derived from it is labelled approximate, and a climatology measured at the
+   user's own point replaces it whenever one can be fetched. */
+const ZONE_KEY = 'seedscout.zone.v1';
+const ZONE_FROST = {
+  1: ['06-15','08-20'], 2: ['06-01','09-01'], 3: ['05-20','09-15'], 4: ['05-12','09-25'],
+  5: ['05-01','10-05'], 6: ['04-18','10-17'], 7: ['04-03','10-29'], 8: ['03-18','11-12'],
+  9: ['02-20','12-05'], 10:['01-25','12-20'],
+  // 11 and up have no frost date worth planning against.
+};
+// 'a' is the colder half of a zone: spring frost runs later, autumn frost earlier.
+const HALF_SHIFT = 8;
+
+// Weeks from sowing to a seedling big enough to plant out. Eight is the usual
+// figure for herbaceous plants raised under cover; woody seedlings often want a
+// full extra season, so this is a floor rather than a promise.
+const GROW_DAYS = 56;
+// Roots need warm soil before winter. Six weeks between planting out and the
+// average first frost is the conventional minimum.
+const ESTABLISH_DAYS = 42;
+// Sowing is a window, not a date.
+const SOW_SPAN = 14;
+// Where frost never arrives, it cannot time anything: the limiting season is
+// summer drought and heat, so seed goes in with the autumn rains and seedlings
+// go out across the cool half of the year.
+const MILD_SOW = ['10-01','11-15'], MILD_PLANT = ['10-15','02-15'];
+
+let ZONE = {zone: null, climate: null};
+
+const mdToDate = (md, y) => { const [m, d] = md.split('-').map(Number);
+                              return new Date(y, m-1, d, 12); };
+const mdOf = d => `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const shiftMD = (md, n) => mdOf(addDays(mdToDate(md, 2025), n));
+const mdOfDoy = n => { const d = new Date(2025, 0, 1); d.setDate(Math.round(n)); return mdOf(d); };
+const mdLabel = md => mdToDate(md, 2025)
+  .toLocaleDateString(undefined, {month:'short', day:'numeric'});
+// Planting dates run up to fourteen months out, so the year is shown once it
+// stops being the obvious one.
+const dateLabel = d => d.toLocaleDateString(undefined, {month:'short', day:'numeric',
+  ...(d.getFullYear() === new Date().getFullYear() ? {} : {year:'numeric'})});
+
+// USDA zones are 10 °F bands of average annual extreme minimum, zone 1 starting
+// at -60 °F, each split into a colder 'a' and a warmer 'b' half.
+function zoneFromMinF(t){
+  const n = Math.max(1, Math.min(13, Math.floor((t + 60) / 10) + 1));
+  return `${n}${(((t + 60) % 10) + 10) % 10 >= 5 ? 'b' : 'a'}`;
+}
+
+function zoneClimate(zone){
+  const n = parseInt(zone, 10), half = /b$/i.test(zone) ? 1 : -1;
+  const pair = ZONE_FROST[n];
+  if (!pair) return {zone, source: 'zone', frostFree: true, lastFrost: null, firstFrost: null};
+  return {
+    zone, source: 'zone', frostFree: false,
+    lastFrost:  shiftMD(pair[0], -half * HALF_SHIFT),
+    firstFrost: shiftMD(pair[1],  half * HALF_SHIFT),
+  };
+}
+
+// Ten years of daily minimum temperature at the query point, reduced to the
+// three numbers that matter: the average coldest night (which *is* the zone
+// definition), the average last spring frost, and the average first autumn one.
+// ERA5 reanalysis is ~9 km grid cells, so it misses cold-air drainage in a
+// valley bottom and reads a ridge as milder than it is.
+async function measureClimate(lat, lng){
+  const y = new Date().getFullYear();
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}`
+    + `&start_date=${y-10}-01-01&end_date=${y-1}-12-31&daily=temperature_2m_min`
+    + `&temperature_unit=fahrenheit&timezone=auto`;
+  const daily = (await (await fetch(url)).json()).daily || {};
+  const time = daily.time || [], tmin = daily.temperature_2m_min || [];
+  const years = new Map();
+  for (let i = 0; i < time.length; i++){
+    const t = tmin[i];
+    if (t == null) continue;
+    const d = new Date(time[i] + 'T12:00'), yr = d.getFullYear();
+    if (!years.has(yr)) years.set(yr, {min: Infinity, spring: null, fall: null});
+    const rec = years.get(yr);
+    rec.min = Math.min(rec.min, t);
+    // Frost before August closes the spring; from August on it opens the autumn.
+    if (t <= 32){
+      if (d.getMonth() < 7) rec.spring = doy(d);
+      else if (rec.fall == null) rec.fall = doy(d);
+    }
+  }
+  const ys = [...years.values()].filter(r => r.min < Infinity);
+  if (ys.length < 3) throw new Error('too few years returned');
+  const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const springs = ys.map(r => r.spring).filter(v => v != null);
+  const falls   = ys.map(r => r.fall).filter(v => v != null);
+  const minF = mean(ys.map(r => r.min));
+  return {
+    zone: zoneFromMinF(minF), source: 'measured', years: ys.length, minF: Math.round(minF),
+    at: {lat: +(+lat).toFixed(2), lng: +(+lng).toFixed(2)},
+    lastFrost:  springs.length ? mdOfDoy(mean(springs)) : null,
+    firstFrost: falls.length   ? mdOfDoy(mean(falls))   : null,
+    // Frost in fewer than half the years is not something to plan against.
+    frostFree: springs.length < ys.length/2 || falls.length < ys.length/2,
+  };
+}
+
+const loadZone = () => { try { ZONE = JSON.parse(localStorage.getItem(ZONE_KEY)) || ZONE; }
+                         catch {} };
+const saveZone = () => localStorage.setItem(ZONE_KEY, JSON.stringify(ZONE));
+
+/* ---------- planting calendar ---------- */
+// Planting windows are seasonal, so they are resolved against the calendar by
+// scanning adjacent years and taking the first season that has not closed yet.
+// A window may cross the new year, which is why the end is re-anchored rather
+// than compared to the start as a plain date.
+function season(startMd, startOff, endMd, endOff, from = today0()){
+  const y0 = from.getFullYear();
+  for (const y of [y0-1, y0, y0+1, y0+2]){
+    const start = addDays(mdToDate(startMd, y), startOff);
+    let end = addDays(mdToDate(endMd, y), endOff);
+    if (end <= start) end = addDays(mdToDate(endMd, y+1), endOff);
+    if (daysBetween(from, end) >= 0) return {start, end};
+  }
+  return null;
+}
+
+// A task is either a window (start + end) or a deadline (end alone).
+function taskState(task, from = today0()){
+  if (task.start && daysBetween(from, task.start) > 0)
+    return {state: 'ahead', left: daysBetween(from, task.start)};
+  const left = daysBetween(from, task.end);
+  return left >= 0 ? {state: 'open', left} : {state: 'missed', left};
+}
+
+function taskWhen(task){
+  return task.start ? `${dateLabel(task.start)} – ${dateLabel(task.end)}`
+                    : `by ${dateLabel(task.end)}`;
+}
+
+function stateLabel(s, task){
+  if (s.state === 'missed') return `${-s.left} d overdue`;
+  if (s.state === 'ahead')  return `opens in ${s.left} d`;
+  return task.start ? `open now · ${s.left} d left` : `${s.left} d left`;
+}
+
+// What a seed lot needs doing next, and when. Everything here is derived from
+// the lot's own propagation record plus the frost dates: nothing is stored.
+function plantingPlan(rec, taxon, clim){
+  const p = rec.prop || {}, tasks = [], notes = [];
+  if (!clim) return {tasks, notes};
+  const mild = clim.frostFree || !clim.lastFrost || !clim.firstFrost;
+  const st = p.stratify || {};
+  const chill = st.method && st.method !== 'none needed' ? Math.max(0, +st.days || 0) : 0;
+  // A handling note that says "cold-moist stratify" but no recorded duration
+  // means any sowing date the app computes is wrong by however long the chill
+  // needed to be. Say so rather than quietly ignoring it.
+  const implied = !st.method && /stratif/i.test(taxon?.tips?.handling || '');
+
+  const sowWindow = from => mild
+    ? season(MILD_SOW[0], 0, MILD_SOW[1], 0, from)
+    : season(clim.lastFrost, -GROW_DAYS - SOW_SPAN, clim.lastFrost, -GROW_DAYS + SOW_SPAN, from);
+
+  if (!p.sown?.date){
+    if (chill && !st.start){
+      // The date worth a reminder is not the sowing date — it is the day the
+      // seed has to go into the fridge for chilling to finish in time.
+      let win = sowWindow(), by = addDays(win.start, -chill);
+      // Already too late for this season's sowing: aim at the next one.
+      if (daysBetween(today0(), by) < -14){
+        win = sowWindow(addDays(win.end, 1));
+        by = addDays(win.start, -chill);
+      }
+      tasks.push({key: 'chill', title: `Start ${st.method} stratification`, end: by,
+        detail: `${chill} d of chilling, to finish for the ${
+          dateLabel(win.start)} – ${dateLabel(win.end)} sowing window`});
+    } else if (!chill){
+      // No chilling required, so the sowing window itself is the action.
+      const win = sowWindow();
+      tasks.push({key: 'sow', title: mild ? 'Sow outdoors' : 'Sow under cover',
+        start: win.start, end: win.end,
+        detail: mild
+          ? 'with the first autumn rains, so seedlings grow through the cool season'
+          : `so seedlings are ${GROW_DAYS} d old — transplant size — by the average last frost (${
+              mdLabel(clim.lastFrost)})`});
+      if (implied) notes.push('The handling note for this species mentions stratification. '
+        + 'Set a method and duration below and this becomes a chilling start date — until then '
+        + 'the sowing window above ignores the chill the seed needs.');
+    }
+    // A lot already chilling is covered by the stratification readout, which
+    // counts down to the same sowing date. One reminder, not two.
+  }
+
+  if (p.sown?.date && !p.planted?.date){
+    const plantWindow = from => mild
+      ? season(MILD_PLANT[0], 0, MILD_PLANT[1], 0, from)
+      : season(clim.lastFrost, 0, clim.firstFrost, -ESTABLISH_DAYS, from);
+    // Seedlings are only plantable once they have size, so the window opens at
+    // whichever comes later: the season, or the seedlings being ready.
+    const ready = addDays(parseDate(p.germ?.date || p.sown.date), GROW_DAYS);
+    let win = plantWindow(ready > today0() ? ready : today0());
+    let start = win.start > ready ? win.start : ready;
+    // A fortnight at the tail of the season is not a planting window — there is
+    // no time to root. Hold the seedlings on and open the next one instead.
+    if (daysBetween(start, win.end) < SOW_SPAN){
+      win = plantWindow(addDays(win.end, 1));
+      start = win.start;
+      notes.push('These seedlings come ready too late to root before the season closes. '
+        + 'Hold them under cover and plant out at the start of the next window.');
+    }
+    tasks.push({key: 'plant', title: 'Plant out', start, end: win.end,
+      detail: mild
+        ? `through the cool season, once seedlings are ${GROW_DAYS} d old`
+        : `after the average last frost (${mdLabel(clim.lastFrost)}), with ${ESTABLISH_DAYS
+           } d to root before the first (${mdLabel(clim.firstFrost)})`});
+    if (!p.germ?.date) notes.push('Planting-out dates are counted from the sowing date. '
+      + 'Record first germination and they recount from the day the seedlings actually appeared.');
+  }
+  return {tasks, notes};
 }
 
 const sel = (name, opts, val) => `<select data-path="${name}">
@@ -1071,6 +1315,40 @@ function photoSection(rec, photos){
   </fieldset>`;
 }
 
+// Sits at the top of a lot's panel: it is the only part about what to do next
+// rather than what has already been done.
+function calendarSection(rec, taxon, p){
+  const v = (g, f) => esc(p[g]?.[f] ?? '');
+  const plan = plantingPlan(rec, taxon, ZONE.climate);
+  let body;
+  if (!ZONE.climate){
+    body = `<div class="hint">Set your planting zone above and this lot gets its own sowing
+      and planting-out dates.</div>`;
+  } else if (plan.tasks.length){
+    body = plan.tasks.map(t => {
+      const s = taskState(t);
+      const cls = s.state === 'missed' ? 'late' : s.state === 'open' ? 'active' : '';
+      return `<div class="readout ${cls}">${esc(t.title)}: ${esc(taskWhen(t))} ·
+        ${esc(stateLabel(s, t))}</div><div class="hint">${esc(t.detail)}</div>`;
+    }).join('');
+  } else {
+    body = p.planted?.date
+      ? `<div class="hint">Planted out ${esc(p.planted.date)} — nothing further scheduled.</div>`
+      : `<div class="hint">The stratification countdown below carries this lot to its
+         sowing date.</div>`;
+  }
+  return `<fieldset><legend>Planting calendar</legend>
+    ${body}
+    ${plan.notes.map(n => `<div class="hint">${esc(n)}</div>`).join('')}
+    <div class="row3">
+      <div><label>Planted out</label><input type="date" data-path="planted.date"
+        value="${v('planted','date')}"></div>
+      <div><label>Plants set out</label><input type="number" min="0" data-path="planted.count"
+        value="${v('planted','count')}"></div>
+    </div>
+  </fieldset>`;
+}
+
 function propPanel(rec, taxon, photos = []){
   const p = rec.prop || {}, lc = lifecycle(rec);
   const v = (g, f) => esc(p[g]?.[f] ?? '');
@@ -1088,6 +1366,7 @@ function propPanel(rec, taxon, photos = []){
 
   return `<div class="prop">
     ${hint}
+    ${calendarSection(rec, taxon, p)}
     ${photoSection(rec, photos)}
     <fieldset><legend>Storage</legend>
       <div class="row3">
@@ -1128,17 +1407,39 @@ function propPanel(rec, taxon, photos = []){
   </div>`;
 }
 
+// How far ahead a planting task is worth raising. Stratification keeps its
+// tighter window because it is a countdown already visible on the lot; a sowing
+// or planting date needs enough notice to buy medium and clear bench space.
+const STRAT_LEAD = 14, PLANT_LEAD = 30;
+
 function renderAttention(list){
   const box = $('attention');
-  const due = list.map(r => ({r, lc: lifecycle(r)}))
-                  .filter(x => x.lc.due && x.lc.due.left <= 14)
-                  .sort((a,b) => a.lc.due.left - b.lc.due.left);
-  if (!due.length){ box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="attention"><b>Needs attention</b>` + due.map(({r, lc}) =>
-    `<div class="line ${lc.due.left <= 0 ? 'late' : ''}">
-       <span>${esc(r.common || r.species)}</span>
-       <b>${lc.due.left > 0 ? `${lc.due.left} d left` : `${-lc.due.left} d overdue`}</b>
-     </div>`).join('') + `</div>`;
+  const rank = {missed: 0, open: 1, ahead: 2};
+  const items = [];
+  for (const r of list){
+    const lc = lifecycle(r);
+    if (lc.due && lc.due.left <= STRAT_LEAD)
+      items.push({name: r.common || r.species, what: lc.due.text,
+        state: lc.due.left > 0 ? 'open' : 'missed', left: lc.due.left,
+        when: lc.due.left > 0 ? `${lc.due.left} d left` : `${-lc.due.left} d overdue`});
+    for (const t of plantingPlan(r, BY_ID.get(r.taxon_id), ZONE.climate).tasks){
+      const s = taskState(t);
+      if (s.state === 'ahead' && s.left > PLANT_LEAD) continue;
+      items.push({name: r.common || r.species, what: `${t.title} · ${taskWhen(t)}`,
+        state: s.state, left: s.left, when: stateLabel(s, t)});
+    }
+  }
+  // Overdue first, then what is open, then what is coming — each soonest first.
+  items.sort((a, b) => rank[a.state] - rank[b.state] || a.left - b.left);
+
+  const prompt = !ZONE.climate && list.length
+    ? `<div class="line"><span>Set a planting zone above for sowing and planting-out
+        dates</span></div>` : '';
+  if (!items.length && !prompt){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="attention"><b>Needs attention</b>${prompt}` + items.map(i =>
+    `<div class="line ${i.state === 'missed' ? 'late' : ''}">
+       <span>${esc(i.name)}</span><b>${esc(i.when)}</b>
+     </div><div class="sub">${esc(i.what)}</div>`).join('') + `</div>`;
 }
 
 async function renderLog(){
@@ -1347,7 +1648,7 @@ $('r-export').onclick = () => {
   const base = ['date','species','common','taxon_id','lat','lng','elev','qty','notes'];
   const propCols = ['storage.method','storage.date','scarify.method','scarify.date',
                     'stratify.method','stratify.start','stratify.days','sown.date','sown.count',
-                    'sown.medium','germ.date','germ.count'];
+                    'sown.medium','germ.date','germ.count','planted.date','planted.count'];
   const cols = [...base, 'modelled_peak_doy','days_from_peak',
                 ...propCols.map(c => c.replace('.','_')),
                 'stratify_end','germination_rate','days_to_germination'];
@@ -1401,6 +1702,52 @@ $('r-exportp').onclick = async () => {
     // Browsers throttle rapid programmatic downloads; pace them.
     await new Promise(r => setTimeout(r, 350));
     URL.revokeObjectURL(url);
+  }
+};
+
+/* ---------- planting zone UI ---------- */
+function renderZone(){
+  const c = ZONE.climate;
+  $('zone').value = ZONE.zone || '';
+  if (!c){
+    $('zonereadout').textContent = 'No zone set. Pick one, or measure it from where the map pin '
+      + 'sits — sowing and planting-out dates stay hidden until there is one.';
+    return;
+  }
+  const how = c.source === 'measured'
+    ? `Measured from ${c.years} years of daily minima at ${c.at.lat}, ${c.at.lng}`.replace(/-/g,'−')
+      + `: the coldest night of the year averages ${c.minF} °F.`
+    : 'Typical values for the zone. A zone band runs coast to interior, so check them against '
+      + 'local knowledge — a measurement from the map pin is better.';
+  $('zonereadout').textContent = (c.frostFree
+    ? `Zone ${c.zone} · no dependable frost, so sowing and planting are timed to the cool season `
+      + `instead. `
+    : `Zone ${c.zone} · average last frost ${mdLabel(c.lastFrost)}, first frost ${
+        mdLabel(c.firstFrost)}. `) + how;
+}
+
+function setZone(zone, climate){
+  ZONE = zone ? {zone, climate: climate || zoneClimate(zone)} : {zone: null, climate: null};
+  saveZone(); renderZone(); renderLog();
+}
+
+$('zone').innerHTML = '<option value="">not set</option>' +
+  Array.from({length: 13}, (_, i) => i + 1)
+    .flatMap(n => ['a','b'].map(h => `${n}${h}`))
+    .map(z => `<option value="${z}">Zone ${z}</option>`).join('');
+$('zone').onchange = () => setZone($('zone').value);
+
+$('zone-detect').onclick = async () => {
+  const b = $('zone-detect');
+  b.textContent = 'Measuring…'; b.disabled = true;
+  try {
+    const c = await measureClimate(POS.lat, POS.lng);
+    setZone(c.zone, c);
+  } catch {
+    $('zonereadout').textContent = 'Could not fetch climate history for that point. '
+      + 'Pick a zone by hand instead.';
+  } finally {
+    b.textContent = 'From the map pin'; b.disabled = false;
   }
 };
 

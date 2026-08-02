@@ -119,7 +119,9 @@ radius straddles tile boundaries.
 
 - **Find seed** — set a location by tapping the map, dragging the pin, or using device geolocation;
   the search radius is drawn as a circle. Species are grouped into *collectible now*, *coming up*,
-  and *just missed*, ranked by proximity to the modelled peak, local abundance, and confidence.
+  and *just missed*. *Collectible now* and *just missed* are ranked by proximity to the modelled
+  peak, local abundance, and confidence; *coming up* is a calendar rather than a ranking, so it runs
+  soonest first and ties break on the same score.
 - **Timeline** — every species shows a full-year bar: flowering period, fruiting period, ripe
   window, and the selected date.
 - **Photos** — CC-licensed iNaturalist images pulled from observations *inside* each ripe window, so
@@ -139,13 +141,14 @@ The second tab tracks a seed lot from the field to the garden.
 
 **Collection** — species, date, location, elevation, quantity, notes.
 
-**Propagation** — storage, scarification, stratification, sowing, and germination. Two things are
-computed rather than stored:
+**Propagation** — storage, scarification, stratification, sowing, germination, and planting out.
+Three things are computed rather than stored:
 
 - **Stratification due dates.** A lot reads `stratifying · 40 d left`, then flips to `ready to sow`
   and appears under *Needs attention*. This is the step that gets missed, because it falls due
   months after the work that starts it.
 - **Germination rate** — seedlings over seeds sown, and days to first germination.
+- **The planting calendar** — see below.
 
 **Photos** — camera capture at each stage: the parent plant, cleaned seed, first pot, seedlings, and
 final planting location. Images are downscaled to 1400 px and stored in IndexedDB.
@@ -153,9 +156,43 @@ final planting location. Images are downscaled to 1400 px and stored in IndexedD
 Each lot surfaces its species' handling note inline, so a toyon lot shows *"Cold-moist stratify 1–3
 months"* directly above the stratification fields.
 
-Records live in `localStorage` and photos in IndexedDB, both browser-local and never uploaded.
+Records and the planting zone live in `localStorage` and photos in IndexedDB, all browser-local and
+never uploaded.
 Export to CSV or JSON. The CSV carries the full propagation schedule alongside `modelled_peak_doy`
 and `days_from_peak`; that signed offset is the ground truth needed to recalibrate `RIPE_QUANTILES`.
+
+## Planting and transplanting times
+
+Given a planting zone, every seed lot gets its own dated schedule, and anything falling due appears
+under *Needs attention* alongside the stratification countdown — overdue first, then what is open,
+then what is coming, each soonest first.
+
+- **Start stratification by `<date>`.** The reminder that matters is not the sowing date but the day
+  seed has to go into the fridge for a 90-day chill to finish in time. Raised 14 days ahead.
+- **Sow `<window>`.** Under cover, `GROW_DAYS` before the average last frost, so seedlings are
+  transplant-size when frost risk ends. Raised 30 days ahead, because it means buying medium and
+  clearing bench space.
+- **Plant out `<window>`.** Opens at whichever is later — the average last frost, or the seedlings
+  reaching `GROW_DAYS` old — and closes `ESTABLISH_DAYS` before the average first frost. A lot that
+  comes ready inside the last fortnight of a season is held over to the next one rather than sent
+  out with no time to root.
+
+Where frost is not a dependable annual event, it cannot time anything: sowing and planting move to
+the autumn rains and the cool half of the year instead.
+
+**Frost dates come from one of two places.** *From the map pin* pulls ten years of daily minimum
+temperature at the pin and reduces it to the average coldest night — which is the actual definition
+of a USDA zone — plus the mean last spring and first autumn frost dates. That is a ~9 km reanalysis
+grid, so it misses cold-air drainage in a valley bottom and reads a ridge as milder than it is.
+Falling back, picking a zone by hand uses a table of conventional average frost dates per zone; a
+zone band runs coast to interior, so the same zone can differ by a month either side. Which source
+is in use is stated on screen, and every derived date is shown as a window rather than a day.
+
+`GROW_DAYS` (56) and `ESTABLISH_DAYS` (42) are conventional figures for herbaceous plants raised
+under cover. Woody seedlings usually want a full extra season, so treat the planting-out date as a
+floor. Nothing here is species-specific: a handling note that mentions stratification but has no
+duration recorded says so on the lot, because the sowing date it produces is otherwise wrong by
+however long the chill needed to be.
 
 ## Layout
 
