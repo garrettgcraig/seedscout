@@ -74,6 +74,23 @@ in this dataset, flowering shifts +0.60 days per 100 m and fruiting +0.85, so th
 lag the model runs on shifts +0.52 with an interquartile range straddling zero. Anchoring on the
 flowering peak already absorbs the effect, and a lapse term would double-count it.
 
+## Native or introduced
+
+Establishment is a local fact, not a species-level one, so it is resolved per tile the same way
+phenology is. *Robinia pseudoacacia* is native to the Appalachians and introduced almost everywhere
+else; asking whether it is "introduced in the United States" has no useful answer.
+
+iNaturalist records establishment per place, and the native and introduced lists for a tile overlap
+more than you would expect — 74 of Boston's species appear in both — because a few stray or
+mislabelled records are enough to put a species on the wrong list. Observation counts therefore
+decide, and only when one side outweighs the other threefold. Contested species resolve to `null`,
+which the client shows rather than hides: silently dropping a good seed source is worse than
+showing one the collector can judge.
+
+Deciding on presence alone, as an earlier version did, put staghorn sumac at 10 introduced records
+against 5,875 native ones in Massachusetts and hid it from the natives-only default. It is now the
+top result there in late summer.
+
 ## Known limits
 
 - **`RIPE_QUANTILES` is calibrated against nine species.** It is the first thing to revisit when
@@ -96,11 +113,11 @@ flowering peak already absorbs the effect, and a lapse term would double-count i
   season shifts real phenology in ways the model will not see.
 - **Observation density follows people, not plants.** Roadsides and popular trails are heavily
   over-represented relative to back country.
-- **Metadata coverage is thin nationally.** Only 1,265 of 18,138 species carry handling notes,
-  photos or conservation status — the rest were enriched for Southern California or matched to a
-  note by name. Unscreened species are labelled **status unchecked** and down-ranked rather than
-  presented as safe, but that is a warning, not a substitute for checking. Handling notes are
-  hand-written and are not a propagation manual.
+- **Metadata coverage is uneven.** 13,509 species carry family, status and a photo; handling notes
+  reach 64% of species near Santa Barbara but 34% near Miami, because the curated tips are written
+  by family and the eastern and subtropical floras are less well covered. Photo coverage runs
+  68-95% depending on region. Every card states which scope its note came from.
+
 - **The national dataset is truncated at 2020.** iNaturalist throttled the bulk pull at roughly a
   quarter of the way through, so the model is built from observations uploaded through 2020 plus a
   complete Southern California pull. Because records were fetched in id order the truncation is by
