@@ -269,6 +269,8 @@
       <b>30% of the available seed</b>. Get landowner or agency permission first — collecting is
       prohibited in most parks and preserves without a permit. Species flagged
       <span style="color:var(--alert);font-weight:700">rare</span> should not be collected at all.
+    Species marked <b>status unchecked</b> have not been screened against conservation listings —
+    verify before collecting.
     </div>
 
     <div class="legend">
@@ -447,7 +449,7 @@ function timeline(t, today){
    The client loads only the tiles its search circle touches, and a species is
    fitted separately in each tile, because phenology varies across a region far
    more than a single pooled window can express. */
-const TILE_ROOT = 'tiles_socal';
+const TILE_ROOT = 'tiles_conus';
 let TILE_INDEX = null, TAXA = [];
 const TILE_CACHE = new Map();
 const tileName = (r, c) => `${r}_${c}`;
@@ -486,7 +488,7 @@ async function ensureTiles(lat, lng, km){
   // local sample.
   const D = TILE_INDEX.tile_deg;
   const home = tileName(Math.floor(lat/D), Math.floor(lng/D));
-  const rank = {cell: 0, block: 1, region: 2};
+  const rank = {cell: 0, block: 1, area: 2, wide: 3};
   const best = new Map();
   for (const t of want){
     const key = tileName(...t.tile);
@@ -647,7 +649,11 @@ function card(t, local, c, today){
             : c.state === 'soon' ? `from ${fmt(t.ripe_start_doy)}` : `ended ${fmt(t.ripe_end_doy)}`;
 
   const tags = [];
+  // Absent is not the same as false. An unenriched species has no status data at
+  // all, and defaulting that to "safe" is the one silent failure this app must
+  // not have.
   if (t.sensitive) tags.push(['bad', 'rare — do not collect']);
+  else if (t.sensitive === undefined) tags.push(['warn', 'status unchecked']);
   if (t.establishment === 'introduced') tags.push(['grey', 'non-native']);
   if (t.family) tags.push(['fam', t.family, `--h:${FAMILY_HUE.get(t.family) ?? 0}`]);
   tags.push(local > 0
@@ -659,8 +665,11 @@ function card(t, local, c, today){
   if (t.method === 'doy_fallback') tags.push(['warn', 'no flowering data']);
   // How local the window actually is. A fit borrowed from a wider area can miss
   // a climate gradient, which is exactly how a pooled model goes wrong.
-  if (t.fit_level === 'block') tags.push(['grey', 'fitted from surrounding area']);
-  if (t.fit_level === 'region') tags.push(['warn', 'region-wide fit — not local']);
+  // How far the fit had to reach for enough data. 'cell' is this tile alone.
+  const REACH = {block: ['grey', 'fitted from surrounding area'],
+                 area:  ['warn', 'fitted from a wider area'],
+                 wide:  ['warn', 'fitted from a very wide area — treat as approximate']};
+  if (REACH[t.fit_level]) tags.push(REACH[t.fit_level]);
   if (t.ripe_window_days > WIDE_WINDOW)
     tags.push(['warn', `${t.ripe_window_days} d window — too vague to time`]);
 
@@ -782,7 +791,7 @@ function run(){
     const score = (c.state === 'now' ? 1 + c.peak : c.state === 'soon' ? .5 - c.until/200 : .2)
                 * Math.log1p(local) * (0.35 + t.confidence)
                 * (t.establishment === 'introduced' ? 0.3 : 1)
-                * (t.sensitive ? 0.15 : 1)
+                * (t.sensitive ? 0.15 : t.sensitive === undefined ? 0.8 : 1)
                 * (t.ripe_window_days > WIDE_WINDOW ? 0.4 : 1);
     buckets[c.state].push({t, local, c, score});
   }

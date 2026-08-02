@@ -114,7 +114,7 @@ def establishment_sets(bbox: dict) -> tuple[set[int], set[int]]:
     return out[0], out[1]
 
 
-def enrich(model_path: Path, bbox: dict) -> None:
+def enrich(model_path: Path, bbox: dict, photos: bool = True) -> None:
     payload = json.loads(model_path.read_text())
     taxa = payload["taxa"]
     print(f"enriching {len(taxa):,} taxa")
@@ -138,16 +138,22 @@ def enrich(model_path: Path, bbox: dict) -> None:
         fams = [a["name"] for a in d.get("ancestors", []) if a.get("rank") == "family"]
         t["family"] = fams[0] if fams else None
 
+        # Any listing counts, global or from any place. Restricting this to one
+        # state was fine for a single-region build and silently wrong for a
+        # national one. Over-flagging is the safe direction of error here: the
+        # cost of a needless warning is nothing, the cost of a missed one is
+        # someone collecting from a listed population.
         statuses = d.get("conservation_statuses") or []
-        codes = {
-            (s.get("status") or "").upper()
+        places = sorted({
+            (s.get("place") or {}).get("name", "global")
             for s in statuses
-            # Global listings, plus anything listed for a place overlapping us.
-            if s.get("place") is None or "Calif" in (s.get("place") or {}).get("name", "")
-        }
+            if (s.get("status") or "").upper() in SENSITIVE
+        })
+        codes = {(s.get("status") or "").upper() for s in statuses}
         hits = sorted(codes & SENSITIVE)
         t["sensitive"] = bool(hits)
         t["status_codes"] = hits or None
+        t["status_places"] = places or None
         if hits:
             n_sensitive += 1
 
@@ -178,14 +184,21 @@ def enrich(model_path: Path, bbox: dict) -> None:
             t["tips"] = {**tip, "scope": scope}
             n_tips += 1
 
-    print("fetching seed photos")
+    # Photos cost one request per species; family and status come thirty at a
+    # time. On a large region the photo pass is the only expensive part, so it
+    # can be deferred without giving up the conservation flags that decide
+    # whether the app tells someone not to collect.
     n_photos = 0
-    for i, t in enumerate(taxa):
-        t["photos"] = seed_photos(t["taxon_id"], t["ripe_start_doy"], t["ripe_end_doy"])
-        n_photos += bool(t["photos"])
-        print(f"\r  {i + 1:,}/{len(taxa):,} ({n_photos} with photos)", end="", flush=True)
-        time.sleep(1.05)
-    print()
+    if photos:
+        print("fetching seed photos")
+        for i, t in enumerate(taxa):
+            t["photos"] = seed_photos(t["taxon_id"], t["ripe_start_doy"], t["ripe_end_doy"])
+            n_photos += bool(t["photos"])
+            print(f"\r  {i + 1:,}/{len(taxa):,} ({n_photos} with photos)", end="", flush=True)
+            time.sleep(1.05)
+        print()
+    else:
+        print("skipping photos (--no-photos)")
 
     payload["enriched"] = True
     model_path.write_text(json.dumps(payload, separators=(",", ":")))
@@ -213,15 +226,19 @@ def enrich(model_path: Path, bbox: dict) -> None:
 REGIONS = {
     "sbv": dict(swlat=34.0, nelat=35.1, swlng=-120.8, nelng=-118.9),
     "socal": dict(swlat=32.5, nelat=35.1, swlng=-120.8, nelng=-116.5),
+    "conus": dict(swlat=24.4, nelat=49.4, swlng=-125.0, nelng=-66.9),
 }
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("region", choices=sorted(REGIONS))
+    ap.add_argument("--no-photos", action="store_true",
+                    help="skip the one-request-per-species photo pass")
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
-    enrich(root / "web" / f"species_{args.region}.json", REGIONS[args.region])
+    enrich(root / "web" / f"species_{args.region}.json", REGIONS[args.region],
+           photos=not args.no_photos)
 
 
 if __name__ == "__main__":

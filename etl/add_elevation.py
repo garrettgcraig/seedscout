@@ -18,8 +18,10 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-# ~1.1 km at this latitude. Fine enough that elevation error inside a cell is
-# small relative to the phenological signal we are trying to detect.
+# Default snap, overridable with --snap. Elevation feeds only a 10th-90th
+# percentile presence band, so a coarser grid costs almost nothing and saves a
+# great deal of time at national scale: CONUS needs 124,687 lookups at 0.01
+# degrees but only 53,674 at 0.05.
 SNAP = 0.01
 BATCH = 100
 # opentopodata's public instance documents 100 locations/call and 1 call/sec, so
@@ -29,8 +31,10 @@ BATCH = 100
 INTERVAL = 1.1
 
 
-def snap(lat: float, lng: float) -> str:
-    return f"{round(lat / SNAP) * SNAP:.2f},{round(lng / SNAP) * SNAP:.2f}"
+def snap(lat: float, lng: float, step: float = SNAP) -> str:
+    # Decimals must track the step or coarse grids collide into one key.
+    dp = max(2, len(str(step).split(".")[-1]))
+    return f"{round(lat / step) * step:.{dp}f},{round(lng / step) * step:.{dp}f}"
 
 
 def _opentopo(points: list[str]) -> list[float]:
@@ -71,24 +75,43 @@ def fetch_batch(points: list[str]) -> list[float]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("region")
+    ap.add_argument("--snap", type=float, default=SNAP,
+                    help="grid size in degrees (default 0.01; 0.05 suits national builds)")
+    ap.add_argument("--merge", action="append", default=[],
+                    help="also cover another region's observations (repeatable), so a "
+                         "merged tile build finds every point on one grid")
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
-    obs_path = root / "data" / f"obs_{args.region}.jsonl"
-    cache_path = root / "data" / "elevation.json"
+    obs_paths = [root / "data" / f"obs_{r}.jsonl" for r in [args.region, *args.merge]]
+    cache_path = root / "data" / f"elevation_{args.region}.json"
 
+    # The snap travels with the cache so consumers cannot silently key against a
+    # different grid than the one the points were resolved on.
     cache: dict[str, float] = {}
+    legacy = root / "data" / "elevation.json"
     if cache_path.exists():
-        cache = json.loads(cache_path.read_text())
-        print(f"cache holds {len(cache):,} points")
+        blob = json.loads(cache_path.read_text())
+        if blob.get("snap") != args.snap:
+            print(f"cache was built at snap {blob.get('snap')}, rebuilding at {args.snap}")
+        else:
+            cache = blob["points"]
+            print(f"cache holds {len(cache):,} points")
+    elif args.snap == 0.01 and legacy.exists():
+        cache = json.loads(legacy.read_text())
+        print(f"seeded {len(cache):,} points from shared elevation.json")
 
     wanted: set[str] = set()
-    with obs_path.open() as fh:
-        for line in fh:
-            try:
-                r = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            wanted.add(snap(r["lat"], r["lng"]))
+    for obs_path in obs_paths:
+        with obs_path.open() as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                # Only fruiting records feed the elevation band, so resolving
+                # flower-only locations would double the work for nothing.
+                if "fruits" in r.get("phenology", ()):
+                    wanted.add(snap(r["lat"], r["lng"], args.snap))
 
     todo = sorted(wanted - cache.keys())
     print(f"{len(wanted):,} distinct grid points, {len(todo):,} to resolve")
@@ -97,11 +120,12 @@ def main() -> None:
         chunk = todo[i : i + BATCH]
         for point, elev in zip(chunk, fetch_batch(chunk)):
             cache[point] = elev
-        cache_path.write_text(json.dumps(cache))
+        cache_path.write_text(json.dumps({"snap": args.snap, "points": cache}))
         print(f"\r  {min(i + BATCH, len(todo)):,}/{len(todo):,}", end="", flush=True)
         time.sleep(INTERVAL)
 
-    print(f"\ndone: {len(cache):,} points cached -> {cache_path}")
+    cache_path.write_text(json.dumps({"snap": args.snap, "points": cache}))
+    print(f"\ndone: {len(cache):,} points at snap {args.snap} -> {cache_path}")
 
 
 if __name__ == "__main__":

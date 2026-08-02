@@ -14,9 +14,16 @@ catch is sample size: a tile that is small enough to be climatically coherent is
 often too small to fit a season. So each (species, tile) takes the *finest* fit
 it has the data for:
 
-    cell    the tile itself                     - most specific
-    block   the tile plus its eight neighbours  - falls back for sparse species
-    region  everything in the dataset           - last resort, flagged
+    cell    the tile itself          - most specific
+    block   3x3 tiles around it
+    area    5x5 tiles around it
+    wide    7x7 tiles around it       - last resort
+
+The search expands outward but is always bounded. An earlier version fell back
+to "everything in the dataset", which is reasonable inside one coastal region
+and meaningless across a continent: at national scale 45% of fits landed there,
+pooling Florida with Maine. A species that cannot be fitted within seven tiles
+is now omitted rather than answered badly.
 
 The level used is recorded per species so the client can say how local the
 answer actually is.
@@ -39,7 +46,6 @@ import numpy as np
 
 from build_model import (
     CELL_DEG,
-    ELEV_SNAP,
     FRUIT_QUANTILES,
     MIN_FLOWER_OBS,
     MIN_FRUIT_OBS,
@@ -49,6 +55,7 @@ from build_model import (
     elev_key,
     elevation_band,
     fit_taxon,
+    load_elevation,
 )
 
 # Tile size in degrees. Small enough that phenology inside one is reasonably
@@ -56,10 +63,15 @@ from build_model import (
 # falling back. At mid-latitudes 2 degrees is roughly 220 km north-south.
 TILE_DEG = 2.0
 
-# A local fit has to be better-supported than the regional one to be worth
+# A local fit has to be better-supported than a pooled one to be worth
 # preferring, otherwise we trade pooling bias for sampling noise.
 LOCAL_MIN_FRUIT = 15
 LOCAL_MIN_FLOWER = 10
+
+# Expanding search radii in tiles, with the label and confidence multiplier for
+# each. Bounded deliberately: beyond ~7 tiles a "local" window stops meaning
+# anything. The last radius is the widest pooling this model will ever do.
+FIT_LEVELS = [(0, "cell", 1.0), (1, "block", 0.75), (2, "area", 0.6), (3, "wide", 0.45)]
 
 
 def tile_key(lat: float, lng: float) -> tuple[int, int]:
@@ -85,17 +97,31 @@ class Bucket:
             self.cells[k] += v
 
 
-def load(rows_path: Path, elev_cache: dict[str, float]):
-    """Bucket every observation by (taxon, tile), keeping only what the fit needs."""
+def load(rows_paths: list[Path], elev_cache: dict[str, float], elev_snap: float):
+    """Bucket every observation by (taxon, tile), keeping only what the fit needs.
+
+    Several sources can be combined: a national pull truncated by upload date
+    plus a deeper regional one covering the same ground. Observation ids are
+    globally unique, so the union is deduped on the way in and each record is
+    counted once regardless of how many files contain it.
+    """
     buckets: dict[tuple[int, tuple[int, int]], Bucket] = {}
     meta: dict[int, dict] = {}
-    n = 0
-    with rows_path.open() as fh:
+    seen_ids: set[int] = set()
+    n = dupes = 0
+    for rows_path in rows_paths:
+      with rows_path.open() as fh:
         for line in fh:
             try:
                 r = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            oid = r.get("id")
+            if oid is not None:
+                if oid in seen_ids:
+                    dupes += 1
+                    continue
+                seen_ids.add(oid)
             n += 1
             tid = r["taxon_id"]
             meta.setdefault(tid, {
@@ -110,50 +136,38 @@ def load(rows_path: Path, elev_cache: dict[str, float]):
             if "fruits" in r["phenology"]:
                 b.fruit.append(d)
                 b.cells[cell_key(r["lat"], r["lng"])] += 1
-                e = elev_cache.get(elev_key(r["lat"], r["lng"]))
+                e = elev_cache.get(elev_key(r["lat"], r["lng"], elev_snap))
                 if e is not None:
                     b.elevs.append(e)
             if "flowers" in r["phenology"]:
                 b.flower.append(d)
             if n % 500_000 == 0:
                 print(f"\r  read {n:,}", end="", flush=True)
-    print(f"\r  read {n:,} observations -> {len(buckets):,} (taxon, tile) pairs")
+    print(f"\r  read {n:,} unique observations "
+          f"({dupes:,} duplicates skipped) -> {len(buckets):,} (taxon, tile) pairs")
     return buckets, meta
 
 
-def neighbourhood(buckets, tid: int, tile: tuple[int, int]) -> Bucket:
-    """The tile plus its eight neighbours, pooled."""
+def neighbourhood(buckets, tid: int, tile: tuple[int, int], radius: int) -> Bucket:
+    """All tiles within `radius` tiles of this one, pooled."""
     out = Bucket()
     r0, c0 = tile
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
+    for dr in range(-radius, radius + 1):
+        for dc in range(-radius, radius + 1):
             b = buckets.get((tid, (r0 + dr, c0 + dc)))
             if b:
                 out.merge(b)
     return out
 
 
-def build(rows_path: Path, out_dir: Path, region: str) -> dict:
-    elev_path = rows_path.parent / "elevation.json"
-    elev_cache = json.loads(elev_path.read_text()) if elev_path.exists() else {}
+def build(rows_paths: list[Path], out_dir: Path, region: str) -> dict:
+    data_dir = rows_paths[0].parent
+    elev_snap, elev_cache = load_elevation(data_dir, region)
     if not elev_cache:
         print("no elevation cache; elevation filtering will be unavailable")
+    print(f"sources: {', '.join(p.name for p in rows_paths)}")
 
-    buckets, meta = load(rows_path, elev_cache)
-
-    # Region-wide totals per taxon, the last-resort fallback.
-    region_wide: dict[int, Bucket] = {}
-    for (tid, _), b in buckets.items():
-        rb = region_wide.get(tid)
-        if rb is None:
-            rb = region_wide[tid] = Bucket()
-        rb.merge(b)
-
-    region_fit = {}
-    for tid, b in region_wide.items():
-        m = fit_taxon(np.array(b.fruit), np.array(b.flower))
-        if m:
-            region_fit[tid] = m
+    buckets, meta = load(rows_paths, elev_cache, elev_snap)
 
     # Family, conservation status, handling notes and photos, written once per
     # species by enrich_taxa.py and merged into every tile the species appears
@@ -166,32 +180,33 @@ def build(rows_path: Path, out_dir: Path, region: str) -> dict:
         print("  no taxa_meta file; run enrich_taxa.py for photos, tips and status")
 
     tiles: dict[tuple[int, int], list[dict]] = defaultdict(list)
-    levels = {"cell": 0, "block": 0, "region": 0}
+    levels = {name: 0 for _, name, _ in FIT_LEVELS}
 
     for (tid, tile), b in buckets.items():
         if not b.fruit:
             continue   # taxon seen here only in flower; nothing to collect
 
         model = level = None
-        # Finest level first.
-        if len(b.fruit) >= LOCAL_MIN_FRUIT and len(b.flower) >= LOCAL_MIN_FLOWER:
-            model = fit_taxon(np.array(b.fruit), np.array(b.flower))
-            level = "cell"
-        if model is None:
-            nb = neighbourhood(buckets, tid, tile)
-            if len(nb.fruit) >= MIN_FRUIT_OBS and len(nb.flower) >= MIN_FLOWER_OBS:
-                model = fit_taxon(np.array(nb.fruit), np.array(nb.flower))
-                level = "block"
-        if model is None and tid in region_fit:
-            model, level = dict(region_fit[tid]), "region"
+        penalty = 1.0
+        # Expand outward until there is enough data, and stop at the last radius
+        # rather than falling back to the whole dataset.
+        for radius, name, mult in FIT_LEVELS:
+            pool = b if radius == 0 else neighbourhood(buckets, tid, tile, radius)
+            need_fruit = LOCAL_MIN_FRUIT if radius == 0 else MIN_FRUIT_OBS
+            need_flower = LOCAL_MIN_FLOWER if radius == 0 else MIN_FLOWER_OBS
+            if len(pool.fruit) >= need_fruit and len(pool.flower) >= need_flower:
+                model = fit_taxon(np.array(pool.fruit), np.array(pool.flower))
+                if model:
+                    level, penalty = name, mult
+                    break
         if model is None:
             continue
 
         levels[level] += 1
         # A fit borrowed from a wider area is less trustworthy here than its raw
         # sample size suggests.
-        if level != "cell":
-            model["confidence"] = round(model["confidence"] * (0.75 if level == "block" else 0.5), 3)
+        if penalty < 1.0:
+            model["confidence"] = round(model["confidence"] * penalty, 3)
 
         tiles[tile].append({
             **meta[tid], **model, **extra.get(str(tid), {}),
@@ -244,11 +259,16 @@ def build(rows_path: Path, out_dir: Path, region: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("region")
+    ap.add_argument("--merge", action="append", default=[],
+                    help="additional region whose observations should be pooled in "
+                         "(repeatable); duplicates are removed by observation id")
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
-    build(root / "data" / f"obs_{args.region}.jsonl",
-          root / "web" / f"tiles_{args.region}",
-          args.region)
+    paths = [root / "data" / f"obs_{r}.jsonl" for r in [args.region, *args.merge]]
+    missing = [p for p in paths if not p.exists()]
+    if missing:
+        raise SystemExit("missing: " + ", ".join(p.name for p in missing))
+    build(paths, root / "web" / f"tiles_{args.region}", args.region)
 
 
 if __name__ == "__main__":

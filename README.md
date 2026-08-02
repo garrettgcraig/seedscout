@@ -33,13 +33,20 @@ California reports late June and is wrong for everything south of it.
 
 So space is cut into 2° tiles and each species is fitted separately inside each one. The tension is
 sample size — a tile small enough to be climatically coherent is often too small to fit a season —
-so every (species, tile) takes the finest fit its data supports:
+so every (species, tile) takes the finest fit its data supports, searching outward until it has
+enough:
 
-| level | fitted from | share (SoCal) |
+| level | fitted from | share (national) |
 |---|---|---|
-| `cell` | the tile itself | 26% |
-| `block` | the tile plus its eight neighbours | 64% |
-| `region` | everything in the dataset | 10% |
+| `cell` | the tile itself | 8% |
+| `block` | 3×3 tiles | 63% |
+| `area` | 5×5 tiles | 19% |
+| `wide` | 7×7 tiles | 9% |
+
+The search is bounded on purpose. An earlier version fell back to "everything in the dataset",
+which is defensible inside one coastal region and meaningless across a continent — at national
+scale 45% of fits landed there, pooling Florida with Maine. A species that cannot be fitted within
+seven tiles is now omitted rather than answered badly.
 
 Anything coarser than `cell` carries a confidence penalty and is labelled on the card, so a window
 borrowed from a wider area never passes as a local one.
@@ -49,8 +56,12 @@ fruiting, plus the 10th–90th percentile elevation band of those records. The c
 two at query time — what grows near you, crossed with what is ripe now.
 
 Against 10 species with well-documented Santa Barbara phenology, 8 of 10 modelled peaks fall inside
-the documented collection window, against 7 of 10 for a single pooled regional fit. Median window
-width is 45 days.
+the documented collection window, against 7 of 10 for a single pooled regional fit.
+
+The continental gradient comes out of the fits rather than being imposed on them. *Acer rubrum*
+samara drop is modelled at Mar 6 in Tallahassee, Mar 28 in Charlotte, Apr 27 in New York and May 18
+in Burlington — about five days per degree of latitude, which is roughly what red maple does. A
+pooled national fit would return one date for all four.
 
 ## Elevation
 

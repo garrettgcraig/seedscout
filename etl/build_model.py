@@ -142,8 +142,21 @@ def cell_key(lat: float, lng: float) -> str:
     return f"{int(np.floor(lat / CELL_DEG))},{int(np.floor(lng / CELL_DEG))}"
 
 
-def elev_key(lat: float, lng: float) -> str:
-    return f"{round(lat / ELEV_SNAP) * ELEV_SNAP:.2f},{round(lng / ELEV_SNAP) * ELEV_SNAP:.2f}"
+def elev_key(lat: float, lng: float, step: float = ELEV_SNAP) -> str:
+    dp = max(2, len(str(step).split(".")[-1]))
+    return f"{round(lat / step) * step:.{dp}f},{round(lng / step) * step:.{dp}f}"
+
+
+def load_elevation(data_dir, region: str) -> tuple[float, dict[str, float]]:
+    """Return (snap, points), accepting both the region cache and the legacy flat file."""
+    scoped = data_dir / f"elevation_{region}.json"
+    if scoped.exists():
+        blob = json.loads(scoped.read_text())
+        return blob.get("snap", ELEV_SNAP), blob.get("points", {})
+    legacy = data_dir / "elevation.json"
+    if legacy.exists():
+        return ELEV_SNAP, json.loads(legacy.read_text())
+    return ELEV_SNAP, {}
 
 
 def elevation_band(elevs: list[float]) -> dict | None:
@@ -180,10 +193,7 @@ def build(rows_path: Path, out_path: Path, region: str, keep_enrichment: bool = 
     meta: dict[int, dict] = {}
     n_rows = 0
 
-    elev_cache_path = rows_path.parent / "elevation.json"
-    elev_cache: dict[str, float] = (
-        json.loads(elev_cache_path.read_text()) if elev_cache_path.exists() else {}
-    )
+    elev_snap, elev_cache = load_elevation(rows_path.parent, region)
     if not elev_cache:
         print("no elevation cache found; run add_elevation.py for elevation filtering")
 
@@ -206,7 +216,7 @@ def build(rows_path: Path, out_path: Path, region: str, keep_enrichment: bool = 
                 # we care where a taxon actually sets seed, not merely where it
                 # has been photographed.
                 cells[tid][cell_key(r["lat"], r["lng"])] += 1
-                e = elev_cache.get(elev_key(r["lat"], r["lng"]))
+                e = elev_cache.get(elev_key(r["lat"], r["lng"], elev_snap))
                 if e is not None:
                     elevs[tid].append(e)
             if "flowers" in r["phenology"]:
