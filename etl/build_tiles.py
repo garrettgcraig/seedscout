@@ -179,6 +179,15 @@ def build(rows_paths: list[Path], out_dir: Path, region: str) -> dict:
     else:
         print("  no taxa_meta file; run enrich_taxa.py for photos, tips and status")
 
+    # Establishment resolved per tile by establishment_tiles.py. It is local,
+    # not species-level: Geranium robertianum is native in the east and invasive
+    # in the Pacific Northwest, so a single national answer is wrong for exactly
+    # the species the native filter exists to catch.
+    est_path = data_dir / f"establishment_tiles_{region}.json"
+    per_tile_est = json.loads(est_path.read_text()) if est_path.exists() else {}
+    if per_tile_est:
+        print(f"  merging per-tile establishment for {len(per_tile_est):,} tiles")
+
     tiles: dict[tuple[int, int], list[dict]] = defaultdict(list)
     levels = {name: 0 for _, name, _ in FIT_LEVELS}
 
@@ -208,8 +217,10 @@ def build(rows_paths: list[Path], out_dir: Path, region: str) -> dict:
         if penalty < 1.0:
             model["confidence"] = round(model["confidence"] * penalty, 3)
 
+        local_est = per_tile_est.get(f"{tile[0]}_{tile[1]}", {}).get(str(tid))
         tiles[tile].append({
             **meta[tid], **model, **extra.get(str(tid), {}),
+            **({"establishment": local_est} if local_est else {}),
             "fit_level": level,
             "n_local": len(b.fruit),
             "elevation": elevation_band(b.elevs),

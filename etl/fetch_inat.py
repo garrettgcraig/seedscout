@@ -9,6 +9,7 @@ the id_above cursor because iNat caps page*per_page at 10,000.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import sys
 import time
@@ -17,8 +18,23 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-API = "https://api.inaturalist.org/v1/observations"
+# v2 rather than v1 for one reason: sparse fieldsets. v1 returns the whole
+# observation - every photo, identification, comment and user record - which is
+# 71 KB per observation when the model consumes about ten fields. Asking v2 for
+# only those fields costs 458 bytes per observation, 156x less JSON and 34x less
+# on the wire, and it is faster per page as well. Pulling millions of records
+# through v1 was the reason iNaturalist kept throttling this client.
+API = "https://api.inaturalist.org/v2/observations"
 PER_PAGE = 200
+
+# Exactly what slim() reads, in v2's field-selection syntax. Field names match
+# v1's response shape, so the parsing below is unchanged.
+FIELDS = (
+    "(id:!t,observed_on:!t,geojson:!t,obscured:!t,geoprivacy:!t,"
+    "positional_accuracy:!t,"
+    "taxon:(id:!t,name:!t,preferred_common_name:!t,rank:!t,ancestry:!t),"
+    "annotations:(controlled_attribute_id:!t,controlled_value_id:!t,vote_score:!t))"
+)
 # iNat asks for <=60 requests/min and a real user agent. Pacing exactly at that
 # limit still trips their throttle on a long run, and each 429 costs more in
 # backoff than the pacing would have cost in the first place, so the interval
@@ -44,13 +60,18 @@ def get(url: str, tries: int = 6) -> dict:
     """
     for attempt in range(tries):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            req = urllib.request.Request(
+                url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip"}
+            )
             with urllib.request.urlopen(req, timeout=90) as resp:
+                raw = resp.read()
+                if resp.headers.get("Content-Encoding") == "gzip":
+                    raw = gzip.decompress(raw)
                 _pace["clean"] += 1
                 if _pace["clean"] >= CLEAN_STREAK and _pace["interval"] > MIN_INTERVAL:
                     _pace["interval"] = max(MIN_INTERVAL, _pace["interval"] * 0.85)
                     _pace["clean"] = 0
-                return json.load(resp)
+                return json.loads(raw)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
             if attempt == tries - 1:
                 raise
@@ -135,6 +156,7 @@ def fetch(bbox: dict, out_path: Path, resume: bool = True) -> int:
         per_page=PER_PAGE,
         order_by="id",
         order="asc",
+        fields=FIELDS,
     )
 
     total = get(f"{API}?{urllib.parse.urlencode(dict(params, per_page=0))}")["total_results"]

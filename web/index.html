@@ -704,11 +704,20 @@ function detailHTML(t){
   const scopeNote = p && p.scope !== 'species'
     ? `<div class="scope">General ${p.scope}-level guidance — not specific to this species.</div>` : '';
   return `
-    ${shots.length ? `<div class="shots">${shots.map(s => `
-      <figure><img loading="lazy" src="${esc(s.url)}" alt="${esc(t.name)} in fruit">
-      <figcaption>© ${esc(s.by)} · ${esc(s.license.toUpperCase())} ·
-      <a href="https://www.inaturalist.org/observations/${s.obs}" target="_blank" rel="noopener">iNat</a>
-      </figcaption></figure>`).join('')}</div>` : ''}
+    ${shots.length ? `<div class="shots">${shots.map(s => {
+      // Two kinds of photo. The good one is an observation from inside this
+      // species' ripe window, so it shows fruit. The fallback is the taxon's
+      // default photo, usually a flower - useful for recognising the plant,
+      // useless for judging ripeness, and it must not be passed off as the
+      // former.
+      const habit = s.kind === 'habit';
+      return `<figure><img loading="lazy" src="${esc(s.url)}"
+        alt="${esc(t.name)}${habit ? '' : ' in fruit'}">
+      <figcaption>${habit ? '<b>Whole plant — not seed.</b> ' : ''}${
+        s.by ? '© ' + esc(s.by) + ' · ' : ''}${esc((s.license || '').toUpperCase())}${
+        s.obs ? ` · <a href="https://www.inaturalist.org/observations/${s.obs}" target="_blank" rel="noopener">iNat</a>` : ''}
+      </figcaption></figure>`;
+    }).join('')}</div>` : ''}
     ${p ? `<dl>
       <div><dt>How to tell it is ready</dt><dd>${esc(p.cue)}</dd></div>
       <div><dt>Collecting</dt><dd>${esc(p.collect)}</dd></div>
