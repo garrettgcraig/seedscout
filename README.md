@@ -85,10 +85,10 @@ flowering peak already absorbs the effect, and a lapse term would double-count i
   and 9% exceed 200. These are fits that failed rather than long seasons, typically species that
   flower near year-round so the flowering anchor carries no information. The client tags the former
   and drops the latter.
-- **Three quarters of fits still borrow from beyond their own tile.** Only 26% of species-tile pairs
-  clear the sample-size bar for a `cell` fit; 64% fall back to the surrounding block and 10% to the
-  whole region. Those are labelled, but a `region` fit carries exactly the pooling problem tiling
-  was built to solve. More observations, not better code, is what moves species up a level.
+- **Most fits still borrow from beyond their own tile.** Only 8% of species-tile pairs clear the
+  sample-size bar for a `cell` fit; the rest reach outward, and the 9% at `wide` are pooling across
+  7×7 tiles. Those are labelled, but a wide fit still carries some of the problem tiling was built
+  to solve. More observations, not better code, is what moves species up a level.
 - **Tile edges are hard boundaries.** A species is fitted independently either side of a 2° line
   with no smoothing across it, so two points a kilometre apart on opposite sides of an edge can
   report different windows.
@@ -96,8 +96,20 @@ flowering peak already absorbs the effect, and a lapse term would double-count i
   season shifts real phenology in ways the model will not see.
 - **Observation density follows people, not plants.** Roadsides and popular trails are heavily
   over-represented relative to back country.
-- **Handling notes are hand-written and partial.** 732 of 1,129 species resolve to a note, many only
-  at family level; each card states which. They are not a substitute for a propagation manual.
+- **Metadata coverage is thin nationally.** Only 1,265 of 18,138 species carry handling notes,
+  photos or conservation status — the rest were enriched for Southern California or matched to a
+  note by name. Unscreened species are labelled **status unchecked** and down-ranked rather than
+  presented as safe, but that is a warning, not a substitute for checking. Handling notes are
+  hand-written and are not a propagation manual.
+- **The national dataset is truncated at 2020.** iNaturalist throttled the bulk pull at roughly a
+  quarter of the way through, so the model is built from observations uploaded through 2020 plus a
+  complete Southern California pull. Because records were fetched in id order the truncation is by
+  upload date and not by geography, and day-of-year phenology is largely indifferent to which years
+  it saw — but recent range shifts and newly popular species are under-represented.
+- **Species whose fruit takes more than a year to mature break the flowering anchor.** Red oaks and
+  witch-hazel set fruit that ripens a season or more after flowering, so measuring elapsed days from
+  the flowering peak lands in the wrong part of the cycle. *Hamamelis virginiana* is modelled two
+  months early for this reason.
 
 ## The app
 
