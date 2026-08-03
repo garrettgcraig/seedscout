@@ -3,3 +3,8 @@ data/*.jsonl
 data/*.state.json
 __pycache__/
 .DS_Store
+
+# Generated bundle DB (rebuild with etl/build_sqlite.py)
+ios/SeedScout/Resources/*.sqlite
+ios/build/
+*.xcuserdatad
