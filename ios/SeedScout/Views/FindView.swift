@@ -75,7 +75,9 @@ struct FindView: View {
         ZStack(alignment: .topTrailing) {
             MapReader { proxy in
                 Map(position: $camera) {
-                    Marker("", coordinate: model.coordinate).tint(.seedAccent)
+                    // Spelled out rather than `.seedAccent`: Marker's tint resolves
+                    // against ShapeStyle, which cannot see a Color extension.
+                    Marker("", coordinate: model.coordinate).tint(Color.seedAccent)
                     MapCircle(center: model.coordinate, radius: model.radiusKm * 1000)
                         .foregroundStyle(Color.seedAccent.opacity(0.10))
                         .stroke(Color.seedAccent, lineWidth: 1)
