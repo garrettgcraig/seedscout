@@ -97,12 +97,27 @@ CREATE TABLE cell (
   tile_c   INTEGER NOT NULL,
   n        INTEGER NOT NULL
 );
+
+-- Individual fruiting observations, for the "where might I actually find one"
+-- map on a species page. The 25 km occurrence grid is far too coarse to walk to;
+-- these are the real coordinates people recorded fruit at.
+--
+-- Capped per (species, 25 km cell) rather than globally, so trimming a hotspot
+-- can never empty out a region: what matters is having enough points wherever
+-- the user happens to be standing, not a global total.
+CREATE TABLE obs (
+  taxon_id INTEGER NOT NULL,
+  lat_e5   INTEGER NOT NULL,   -- degrees x 1e5, about 1 m
+  lng_e5   INTEGER NOT NULL,
+  doy      INTEGER NOT NULL    -- lets the map show only records from this season
+);
 """
 
 # Built after the bulk insert: maintaining indexes during a 1.5M row load is
 # markedly slower than creating them once at the end.
 INDEXES = """
 CREATE INDEX cell_rc ON cell(cell_r, cell_c);
+CREATE INDEX obs_taxon ON obs(taxon_id, lat_e5, lng_e5);
 CREATE INDEX photo_taxon ON photo(taxon_id, ord);
 CREATE INDEX fit_taxon ON fit(taxon_id);
 
@@ -115,7 +130,52 @@ INSERT INTO taxon_fts(taxon_fts) VALUES('optimize');
 """
 
 
-def build(tile_dir: Path, out_path: Path) -> None:
+MAX_POINTS_PER_CELL = 60
+
+
+def load_observations(db: sqlite3.Connection, rows_path: Path, known: set[int]) -> int:
+    """Insert fruiting observation coordinates for species the app knows about."""
+    if not rows_path.exists():
+        print(f"  no {rows_path.name}; species pages will have no observation map")
+        return 0
+    seen: dict[tuple[int, int, int], int] = {}
+    batch: list[tuple] = []
+    total = 0
+    with rows_path.open() as fh:
+        for line in fh:
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            tid = r["taxon_id"]
+            if tid not in known or "fruits" not in r["phenology"]:
+                continue
+            lat, lng = r["lat"], r["lng"]
+            key = (tid, int(lat // 0.25), int(lng // 0.25))
+            n = seen.get(key, 0)
+            if n >= MAX_POINTS_PER_CELL:
+                continue
+            seen[key] = n + 1
+            batch.append((tid, round(lat * 1e5), round(lng * 1e5),
+                          doy_of(r["observed_on"])))
+            if len(batch) >= 100_000:
+                db.executemany("INSERT INTO obs VALUES (?,?,?,?)", batch)
+                total += len(batch)
+                batch.clear()
+                print(f"\r  {total:,} observation points", end="", flush=True)
+    if batch:
+        db.executemany("INSERT INTO obs VALUES (?,?,?,?)", batch)
+        total += len(batch)
+    print(f"\r  {total:,} observation points")
+    return total
+
+
+def doy_of(iso: str) -> int:
+    from datetime import datetime
+    return datetime.strptime(iso, "%Y-%m-%d").date().timetuple().tm_yday
+
+
+def build(tile_dir: Path, out_path: Path, obs_path: Path | None = None) -> None:
     index = json.loads((tile_dir / "index.json").read_text())
     if out_path.exists():
         out_path.unlink()
@@ -175,7 +235,10 @@ def build(tile_dir: Path, out_path: Path) -> None:
     for k in ("schema_version", "generated", "region", "tile_deg", "cell_deg"):
         if k in index:
             db.execute("INSERT INTO meta VALUES (?,?)", (k, str(index[k])))
-    db.execute("INSERT INTO meta VALUES ('app_schema','1')")
+    db.execute("INSERT INTO meta VALUES ('app_schema','2')")
+    db.commit()
+
+    n_obs = load_observations(db, obs_path, set(taxa)) if obs_path else 0
     db.commit()
 
     print("  building indexes and FTS")
@@ -190,7 +253,7 @@ def build(tile_dir: Path, out_path: Path) -> None:
 
     mb = out_path.stat().st_size / 1e6
     print(f"\ndone: {len(taxa):,} taxa, {len(fits):,} fits, {len(cells):,} cells, "
-          f"{len(photos):,} photos -> {out_path.name} ({mb:.1f} MB)")
+          f"{len(photos):,} photos, {n_obs:,} obs points -> {out_path.name} ({mb:.1f} MB)")
 
 
 def main() -> None:
@@ -201,7 +264,8 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     out = args.out or root / "ios" / "SeedScout" / "Resources" / f"seedscout_{args.region}.sqlite"
     out.parent.mkdir(parents=True, exist_ok=True)
-    build(root / "web" / f"tiles_{args.region}", out)
+    build(root / "web" / f"tiles_{args.region}", out,
+          root / "data" / f"obs_{args.region}.jsonl")
 
 
 if __name__ == "__main__":

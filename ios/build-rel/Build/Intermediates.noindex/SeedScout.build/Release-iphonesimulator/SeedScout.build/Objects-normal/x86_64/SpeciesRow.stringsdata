@@ -1,0 +1,16 @@
+{
+  "source": "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/SpeciesRow.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%@ – %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 21
+        }
+      }
+    ]
+  },
+  "version": 1
+}

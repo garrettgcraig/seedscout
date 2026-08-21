@@ -36,16 +36,15 @@ struct FindView: View {
                     }
                 }
                 if model.buckets.values.allSatisfy(\.isEmpty) && !model.isLoading {
-                    ContentUnavailableView(
-                        "Nothing ready here",
-                        systemImage: "leaf",
-                        description: Text("Try a wider radius, another date, or turn off the native-only filter.")
-                    )
+                    emptyState
                 }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("SeedScout")
-            .navigationDestination(for: Fit.self) { SpeciesDetailView(fit: $0, day: model.dayOfYear) }
+            .navigationDestination(for: Fit.self) {
+                SpeciesDetailView(fit: $0, day: model.dayOfYear,
+                                  centre: model.coordinate, radiusKm: model.radiusKm)
+            }
             .searchable(text: $model.query, prompt: "Find a specific plant")
             .onChange(of: model.query) { scheduleRefresh(delay: .milliseconds(180)) }
             .task { await model.refresh() }
@@ -156,4 +155,45 @@ struct FindView: View {
             // State is already reflected on the button; nothing further to do.
         }
     }
+
+    /// What to show when nothing came back. The message names the actual reason
+    /// and, where there is one, offers the single control that would fix it.
+    @ViewBuilder private var emptyState: some View {
+        switch model.outcome {
+        case .found:
+            ContentUnavailableView(
+                "Nothing ready here",
+                systemImage: "leaf",
+                description: Text("No species are in their collection window at this date and place. "
+                                  + "Try another date, or a wider radius."))
+        default:
+            VStack(spacing: 12) {
+                Image(systemName: iconName)
+                    .font(.largeTitle).foregroundStyle(.secondary)
+                Text(model.outcome.title).font(.headline).multilineTextAlignment(.center)
+                Text(model.outcome.message)
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                if let action = model.outcome.action {
+                    Button(action.label) { Task { await model.apply(action) } }
+                        .buttonStyle(.borderedProminent).controlSize(.regular)
+                        .padding(.top, 2)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    private var iconName: String {
+        switch model.outcome {
+        case .notInDatabase: return "questionmark.circle"
+        case .notNearby: return "location.slash"
+        case .filteredOut: return "line.3.horizontal.decrease.circle"
+        case .outOfSeason: return "calendar"
+        case .found: return "leaf"
+        }
+    }
+
 }

@@ -1,0 +1,12 @@
+{
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Data/Database.swift" : {
+    "abi-baseline-json" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout.abi.json",
+    "const-values" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.swiftconstvalues",
+    "dependencies" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.d",
+    "diagnostics" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.dia",
+    "objc-header" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-Swift.h",
+    "swiftdoc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout.swiftdoc",
+    "swiftmodule" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout.swiftmodule",
+    "swiftsourceinfo" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout.swiftsourceinfo"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "" : {
+    "const-values" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.swiftconstvalues",
+    "dependencies" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.d",
+    "diagnostics" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.dia",
+    "emit-module-dependencies" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary-emit-module.dia",
+    "pch" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScout-primary.swiftdeps"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Data/Database.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Database.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Database.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Database.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Data/Models.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Models.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Models.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Models.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Data/Phenology.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Phenology.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Phenology.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/Phenology.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Data/SpeciesStore.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesStore.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesStore.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesStore.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/SeedScoutApp.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScoutApp.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScoutApp.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SeedScoutApp.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Support/LocationProvider.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/LocationProvider.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/LocationProvider.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/LocationProvider.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/FindModel.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindModel.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindModel.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindModel.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/FindView.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindView.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindView.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/FindView.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/SpeciesDetailView.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesDetailView.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesDetailView.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesDetailView.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/SpeciesRow.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesRow.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesRow.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/SpeciesRow.o"
+  },
+  "/Users/garrettcraig/Desktop/seedscout/ios/SeedScout/Views/TimelineBar.swift" : {
+    "index-unit-output-path" : "/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/TimelineBar.o",
+    "llvm-bc" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/TimelineBar.bc",
+    "object" : "/Users/garrettcraig/Desktop/seedscout/ios/build-rel/Build/Intermediates.noindex/SeedScout.build/Release-iphonesimulator/SeedScout.build/Objects-normal/arm64/TimelineBar.o"
+  }
+}

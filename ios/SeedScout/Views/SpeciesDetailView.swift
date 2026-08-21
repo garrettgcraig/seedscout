@@ -1,8 +1,13 @@
+import CoreLocation
 import SwiftUI
 
 struct SpeciesDetailView: View {
     let fit: Fit
     let day: Int
+    /// Where the user is searching from, so the observation map can be centred
+    /// and scoped the same way the results list was.
+    let centre: CLLocationCoordinate2D
+    let radiusKm: Double
 
     @State private var photos: [Photo] = []
     @State private var tips: Tips?
@@ -11,6 +16,8 @@ struct SpeciesDetailView: View {
     var body: some View {
         List {
             if !photos.isEmpty { photoStrip }
+
+            ObservationMap(fit: fit, centre: centre, radiusKm: radiusKm, day: day)
 
             Section("Timing") {
                 TimelineBar(fit: fit, day: day).padding(.vertical, 4)

@@ -22,6 +22,8 @@ final class FindModel {
     var query = ""
 
     private(set) var buckets: [Bucket: [Fit]] = [:]
+    /// Why a search came back empty, so the UI can say something true.
+    private(set) var outcome: SearchOutcome = .found
     private(set) var isLoading = false
     private(set) var loadError: String?
     private(set) var speciesCount = 0
@@ -55,6 +57,9 @@ final class FindModel {
                                  elevation: matchElevation ? elevation : nil,
                                  query: query)
             loadError = nil
+            outcome = buckets.values.contains(where: { !$0.isEmpty })
+                ? .found
+                : await diagnose(fits: fits)
         } catch {
             guard mine == generation else { return }
             loadError = error.localizedDescription
@@ -97,4 +102,63 @@ final class FindModel {
             pairs.sorted { $0.1 > $1.1 }.prefix(60).map(\.0)
         }
     }
+
+    /// Work out *why* a search found nothing.
+    ///
+    /// Only runs on an empty result, so the extra queries never slow the common
+    /// path. The order matters: each check rules out a cheaper explanation
+    /// before reaching for a more expensive one.
+    private func diagnose(fits: [Fit]) async -> SearchOutcome {
+        let needle = query.trimmingCharacters(in: .whitespaces)
+        guard !needle.isEmpty, let store else { return .found }
+
+        // 1. Does anything in the whole database match the text? This is the
+        //    FTS index, which is why it costs well under a millisecond.
+        guard let hit = try? await store.find(matching: needle, limit: 1).first else {
+            return .notInDatabase(query: needle)
+        }
+
+        // 2. It exists. Is it among the species found near this point?
+        guard let local = fits.first(where: { $0.taxonID == hit.id }) else {
+            let nearest = try? await store.nearestObservation(taxonID: hit.id, to: coordinate)
+            return .notNearby(name: hit.name, common: hit.common,
+                              nearestKm: nearest?.km, bearing: nearest?.bearing)
+        }
+
+        // 3. It is nearby, so a filter or the calendar is hiding it.
+        if nativesOnly && local.isIntroduced {
+            return .filteredOut(name: local.name, common: local.common, reason: .nonNative)
+        }
+        if matchElevation, let here = elevation, let lo = local.elevLo, let hi = local.elevHi,
+           here < lo - 250 || here > hi + 250 {
+            return .filteredOut(name: local.name, common: local.common,
+                                reason: .elevation(lo: lo, hi: hi, yours: here))
+        }
+        let days: Int
+        switch local.readiness(on: dayOfYear) {
+        case .soon(let d): days = d
+        case .past(let d): days = DOY.year - d
+        case .now: days = 0
+        }
+        return .outOfSeason(name: local.name, common: local.common,
+                            ripeStart: local.ripeStart, ripePeak: local.ripePeak,
+                            daysAway: days)
+    }
+
+    /// Apply the fix a `SearchOutcome.Action` describes.
+    func apply(_ action: SearchOutcome.Action) async {
+        switch action {
+        case .widenRadius:
+            radiusKm = radiusKm >= 100 ? 100 : (radiusKm == 50 ? 100 : (radiusKm == 25 ? 50 : 25))
+        case .showNonNatives:
+            nativesOnly = false
+        case .ignoreElevation:
+            matchElevation = false
+        case .jumpToDate(let doy):
+            var c = DateComponents(); c.year = Calendar.current.component(.year, from: date); c.day = doy
+            if let d = Calendar.current.date(from: c) { date = d }
+        }
+        await refresh()
+    }
+
 }
