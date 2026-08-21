@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
+    --seed-icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
     --bg:#fbfaf7; --panel:#fff; --ink:#1c1f1a; --muted:#6b7263; --line:#e2e0d6;
     --accent:#3f6b2e; --accent-soft:#eaf1e3; --warn:#8a5a12; --warn-soft:#fbf1de;
     --alert:#8c2f2f; --alert-soft:#f8e7e5; --radius:14px;
@@ -52,6 +53,19 @@
   @media (prefers-color-scheme:dark){button{color:#14170f}}
   button:active{opacity:.75}
   button.ghost{background:var(--bg);color:var(--ink);border-color:var(--line);font-weight:500}
+  /* The point of a species page: you are standing at the plant. Previously this
+     used .ghost and read as a footnote. */
+  .logbtn{margin-top:1rem;width:100%;display:flex;align-items:center;justify-content:center;
+    gap:.45rem;padding:.85rem 1rem;font-size:.95rem;font-weight:700;letter-spacing:-.01em;
+    border:0;border-radius:12px;background:var(--accent);color:#fff;
+    box-shadow:0 3px 10px rgba(63,107,46,.28)}
+  .logbtn::before{content:"";width:15px;height:15px;flex:none;
+    background:currentColor;-webkit-mask:var(--seed-icon) center/contain no-repeat;
+    mask:var(--seed-icon) center/contain no-repeat}
+  .logbtn:active{transform:translateY(1px);box-shadow:0 1px 4px rgba(63,107,46,.25)}
+  @media (prefers-color-scheme:dark){
+    .logbtn{color:#14170f;box-shadow:0 3px 10px rgba(0,0,0,.45)}
+  }
   .chk{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--muted)}
   .chk input{width:auto;margin:0}
 
@@ -770,7 +784,7 @@ function detailHTML(t){
       from ${t.n_fruit} fruiting and ${t.n_flower} flowering records.
       ${t.flower_to_ripe_days != null ? `Roughly ${t.flower_to_ripe_days} days after peak bloom.` : ''}
     </dd></div></dl>
-    <button class="logbtn ghost">Log a collection of this species</button>`;
+    <button class="logbtn">Log a collection of this species</button>`;
 }
 
 function renderSearch(query, totals, today){
