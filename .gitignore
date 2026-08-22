@@ -1,10 +1,10 @@
-# Raw observation pulls are large and reproducible from the ETL.
-data/*.jsonl
-data/*.state.json
-__pycache__/
-.DS_Store
 
 # Generated bundle DB (rebuild with etl/build_sqlite.py)
-ios/SeedScout/Resources/*.sqlite
-ios/build/
+# Raw observation pulls are large and reproducible from the ETL.
 *.xcuserdatad
+.DS_Store
+__pycache__/
+data/*.jsonl
+data/*.state.json
+ios/SeedFinder/Resources/*.sqlite
+ios/build/
