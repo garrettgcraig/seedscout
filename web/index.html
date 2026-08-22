@@ -140,6 +140,13 @@
     font-size:.62rem;color:var(--muted);letter-spacing:.04em;margin-top:1px}
   .tlmonths span{text-align:center}
 
+  .legendmore{margin-top:.45rem}
+  .legendmore summary{cursor:pointer;font-weight:600;color:var(--ink);font-size:.76rem;
+    list-style:none;display:flex;align-items:center;gap:.3rem}
+  .legendmore summary::-webkit-details-marker{display:none}
+  .legendmore summary::before{content:"▸";transition:transform .15s;display:inline-block;
+    color:var(--muted)}
+  .legendmore[open] summary::before{transform:rotate(90deg)}
   .group{margin:1.4rem 0 .6rem;display:flex;align-items:baseline;gap:.5rem}
   .group h2{margin:0;font-size:.95rem;letter-spacing:-.01em}
   .group .n{color:var(--muted);font-size:.8rem}
@@ -259,16 +266,23 @@
     header, main, footer{max-width:1180px}
     #pane-find{display:grid;grid-template-columns:340px minmax(0, 1fr);
       gap:1.4rem;align-items:start}
-    #pane-find > .controls,
-    #pane-find > .ethics,
-    #pane-find > .legend{grid-column:1}
-    #pane-find > #out{grid-column:2;grid-row:1 / span 4;margin-top:0}
-    /* Only the controls stick. Sticking the legend too would park it at the
-       same offset and overlap them. The height cap matters because the panel
-       contains a map and grows: without it a short viewport clips the buttons
-       with no way to scroll to them. */
-    #pane-find > .controls{position:sticky;top:1rem;
-      max-height:calc(100vh - 2rem);overflow-y:auto}
+    /* The rail sticks as one piece. Making only .controls sticky left the
+       ethics note and legend to scroll away, which is the opposite of what a
+       sidebar is for. The whole column scrolls internally when it is taller
+       than the viewport, so nothing becomes unreachable on a short screen. */
+    .rail{position:sticky;top:1rem;max-height:var(--rail-max, calc(100vh - 2rem));
+      display:flex;flex-direction:column;gap:1rem;min-height:0}
+    /* The ethics note and the legend are reference material you want in view
+       while reading results, so they hold their place at the bottom of the rail
+       and never scroll. Only the controls give way when the column is taller
+       than the viewport - they are the part you have already used. */
+    /* A floor on the controls: the map is the main input, and letting the
+       pinned panels below squeeze it to a sliver traded one problem for a
+       worse one. */
+    .rail > .controls{flex:1 1 auto;min-height:340px;overflow-y:auto;
+      overscroll-behavior:contain;scrollbar-width:thin}
+    .rail > .ethics, .rail > .legend{flex:none;margin:0}
+    #pane-find > #out{margin-top:0}
     #pane-log{max-width:760px}
     /* The first results heading should line up with the top of the rail. */
     #out > .group:first-child{margin-top:0}
@@ -297,6 +311,7 @@
 
   <!-- ============ FIND ============ -->
   <section id="pane-find">
+    <div class="rail">
     <div class="controls">
       <div>
         <label for="search">Find a specific plant</label>
@@ -359,12 +374,16 @@
         <span class="k"><i class="swatch sw-ripe"></i>seed likely ripe</span>
         <span class="k"><i class="swatch sw-today"></i>selected date</span>
       </div>
-      Each bar is a full year, January to December. <b>In flower</b> means too early — seed has not
-      set. <b>Fruit present</b> is when iNaturalist records show fruit on the plant, green or dried.
-      <b>Seed likely ripe</b> is the modelled collection window, a subset of the fruiting period.
-      Tap a species for photos and handling notes.
+      <details class="legendmore">
+        <summary>What the bars mean</summary>
+        Each bar is a full year, January to December. <b>In flower</b> means too early — seed has not
+        set. <b>Fruit present</b> is when iNaturalist records show fruit on the plant, green or dried.
+        <b>Seed likely ripe</b> is the modelled collection window, a subset of the fruiting period.
+        Tap a species for photos and handling notes.
+      </details>
     </div>
 
+    </div>
     <div id="out"></div>
   </section>
 
@@ -1716,7 +1735,34 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.placewrap')) hidePlaces();
 });
 
+/* The rail is sticky at 1rem, but before the page scrolls it starts below the
+   header, so a flat 100vh cap overruns the bottom of the window by the header's
+   height. Size it to the tightest case - its unscrolled position - rather than
+   recomputing per scroll: a sidebar that changes height as you scroll is worse
+   than one that gives up the header's worth of space. Only the controls inside
+   it scroll; the ethics note and legend keep their place. */
+function fitRail(){
+  // Collapse the legend's prose where the rail is height-constrained; on a
+  // phone the page just scrolls and there is no reason to hide it.
+  const more = document.querySelector('.legendmore');
+  if (more) more.open = !matchMedia('(min-width: 1000px)').matches;
+
+  const rail = document.querySelector('.rail');
+  if (!rail) return;
+  if (!matchMedia('(min-width: 1000px)').matches){
+    rail.style.removeProperty('--rail-max');
+    return;
+  }
+  rail.style.removeProperty('--rail-max');           // measure unconstrained
+  const docTop = rail.getBoundingClientRect().top + window.scrollY;
+  const avail = window.innerHeight - docTop - 16;
+  rail.style.setProperty('--rail-max', `${Math.max(260, Math.round(avail))}px`);
+}
+addEventListener('resize', fitRail);
+
+fitRail();
 load();
+
 </script>
 </body>
 </html>
