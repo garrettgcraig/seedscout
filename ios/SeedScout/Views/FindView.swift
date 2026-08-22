@@ -19,7 +19,6 @@ struct FindView: View {
         NavigationStack {
             List {
                 Section { controls } header: { Text("Where and when") }
-                ethics
                 ForEach(FindModel.Bucket.allCases) { bucket in
                     if let rows = model.buckets[bucket], !rows.isEmpty {
                         Section {
@@ -153,18 +152,6 @@ struct FindView: View {
             .padding(12)
     }
 
-    private var ethics: some View {
-        Section {
-            Label {
-                Text("Collect only from populations of 30+ plants, never more than 30% of the seed, "
-                     + "and never without landowner or agency permission. Species marked rare should "
-                     + "not be collected at all.")
-                .font(.footnote)
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-            }
-        }
-    }
 
     // MARK: - Actions
 

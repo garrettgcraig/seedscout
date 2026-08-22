@@ -117,6 +117,29 @@
   .leaflet-container{font:inherit}
   .leaflet-control-attribution{font-size:.6rem}
 
+  /* Collection guidance as a dismissible top bar. Dismissal is remembered, which
+     is only acceptable because the same guidance is repeated in the log form at
+     the point of actually recording a collection, and rare species carry their
+     own inline warning. */
+  .ethicsbar{background:var(--warn-soft);border-bottom:1px solid var(--warn);
+    position:sticky;top:0;z-index:700}
+  .ethicsbar-in{max-width:1180px;margin:0 auto;padding:.6rem 1.1rem;
+    display:flex;align-items:flex-start;gap:.6rem}
+  .ethicsbar p{margin:0;font-size:.8rem;line-height:1.45;flex:1}
+  .ethicsbar b{color:var(--warn)}
+  .ethicsbar-rare{color:var(--alert);font-weight:700}
+  .ethicsbar-icon{flex:none;width:18px;height:18px;border-radius:50%;
+    background:var(--warn);color:var(--bg);font-weight:800;font-size:.72rem;
+    display:grid;place-items:center;margin-top:.1rem}
+  /* width:auto is load-bearing: the global input/select/button rule sets
+     width:100%, which made this close button claim the whole bar and squeeze
+     the message into a one-word column. */
+  .ethicsbar button{flex:none;width:auto;min-width:28px;height:28px;
+    background:none;border:0;color:var(--muted);
+    font-size:1.3rem;line-height:1;padding:0;cursor:pointer;border-radius:6px}
+  .ethicsbar button:hover{color:var(--ink)}
+  @media (max-width: 560px){ .ethicsbar p{font-size:.76rem} }
+
   .ethics{background:var(--warn-soft);border-left:3px solid var(--warn);
     border-radius:8px;padding:.7rem .8rem;font-size:.83rem;margin-bottom:1rem}
   .ethics b{color:var(--warn)}
@@ -298,6 +321,17 @@
 </style>
 </head>
 <body>
+<div class="ethicsbar" id="ethicsbar" role="note" hidden>
+  <div class="ethicsbar-in">
+    <span class="ethicsbar-icon" aria-hidden="true">!</span>
+    <p><b>Before you collect.</b> Take from populations of <b>30+ plants</b>, never more than
+      <b>30% of the available seed</b>, and get landowner or agency permission first — collecting
+      is prohibited in most parks and preserves without a permit. Species flagged
+      <span class="ethicsbar-rare">rare</span> should not be collected at all, and those marked
+      <b>status unchecked</b> have not been screened against conservation listings.</p>
+    <button id="ethicsclose" type="button" aria-label="Dismiss collection guidance">&times;</button>
+  </div>
+</div>
 <header>
   <h1>Seed<span>Scout</span></h1>
   <div class="sub" id="sub">Loading phenology model…</div>
@@ -358,14 +392,6 @@
       <button id="go">Show ready seed</button>
     </div>
 
-    <div class="ethics">
-      <b>Before you collect.</b> Take from populations of <b>30+ plants</b>, and never more than
-      <b>30% of the available seed</b>. Get landowner or agency permission first — collecting is
-      prohibited in most parks and preserves without a permit. Species flagged
-      <span style="color:var(--alert);font-weight:700">rare</span> should not be collected at all.
-    Species marked <b>status unchecked</b> have not been screened against conservation listings —
-    verify before collecting.
-    </div>
 
     <div class="legend">
       <div class="keys">
@@ -1759,6 +1785,22 @@ function fitRail(){
   rail.style.setProperty('--rail-max', `${Math.max(260, Math.round(avail))}px`);
 }
 addEventListener('resize', fitRail);
+
+/* Collection guidance bar. Hidden once dismissed; the same text still appears in
+   the log form, so dismissing it does not remove the guidance from the flow. */
+const ETHICS_KEY = 'seedscout.ethics.dismissed';
+function initEthicsBar(){
+  const bar = document.getElementById('ethicsbar');
+  if (!bar) return;
+  if (localStorage.getItem(ETHICS_KEY) === '1') return;   // stays hidden
+  bar.hidden = false;
+  document.getElementById('ethicsclose').onclick = () => {
+    bar.hidden = true;
+    try { localStorage.setItem(ETHICS_KEY, '1'); } catch {}
+    fitRail();                                            // rail regains the space
+  };
+}
+initEthicsBar();
 
 fitRail();
 load();
