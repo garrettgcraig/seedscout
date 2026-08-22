@@ -1,11 +1,11 @@
-"""Generate SeedScout.xcodeproj.
+"""Generate SeedFinder.xcodeproj.
 
 Written as a generator rather than a checked-in blob so the project file stays
 readable and regenerable. Uses Xcode 16's file-system synchronised groups, so
-the whole SeedScout/ folder is a single reference: adding a Swift file needs no
+the whole SeedFinder/ folder is a single reference: adding a Swift file needs no
 project edit, which is the usual source of merge pain in a pbxproj.
 
-    python3 ios/make_project.py && open ios/SeedScout.xcodeproj
+    python3 ios/make_project.py && open ios/SeedFinder.xcodeproj
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-BUNDLE_ID = "com.garrettcraig.seedscout"
+BUNDLE_ID = "com.garrettcraig.seedfinder"
 DEPLOYMENT_TARGET = "17.0"
 LOCATION_PURPOSE = (
-    "SeedScout uses your location to show which native plants have collectible "
+    "SeedFinder uses your location to show which native plants have collectible "
     "seed where you are standing."
 )
 
@@ -51,7 +51,7 @@ TARGET_BUILD = f"""
 				CURRENT_PROJECT_VERSION = 1;
 				MARKETING_VERSION = 1.0;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = SeedScout;
+				INFOPLIST_KEY_CFBundleDisplayName = SeedFinder;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "{LOCATION_PURPOSE}";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -72,11 +72,11 @@ def pbxproj() -> str:
 	objects = {{
 
 /* Begin PBXFileReference section */
-		{i['productRef']} /* SeedScout.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeedScout.app; sourceTree = BUILT_PRODUCTS_DIR; }};
+		{i['productRef']} /* SeedFinder.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SeedFinder.app; sourceTree = BUILT_PRODUCTS_DIR; }};
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		{i['syncGroup']} /* SeedScout */ = {{isa = PBXFileSystemSynchronizedRootGroup; path = SeedScout; sourceTree = "<group>"; }};
+		{i['syncGroup']} /* SeedFinder */ = {{isa = PBXFileSystemSynchronizedRootGroup; path = SeedFinder; sourceTree = "<group>"; }};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,7 +93,7 @@ def pbxproj() -> str:
 		{i['mainGroup']} = {{
 			isa = PBXGroup;
 			children = (
-				{i['syncGroup']} /* SeedScout */,
+				{i['syncGroup']} /* SeedFinder */,
 				{i['productsGroup']} /* Products */,
 			);
 			sourceTree = "<group>";
@@ -101,7 +101,7 @@ def pbxproj() -> str:
 		{i['productsGroup']} /* Products */ = {{
 			isa = PBXGroup;
 			children = (
-				{i['productRef']} /* SeedScout.app */,
+				{i['productRef']} /* SeedFinder.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,7 +109,7 @@ def pbxproj() -> str:
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		{i['target']} /* SeedScout */ = {{
+		{i['target']} /* SeedFinder */ = {{
 			isa = PBXNativeTarget;
 			buildConfigurationList = {i['targetConfigList']};
 			buildPhases = (
@@ -122,11 +122,11 @@ def pbxproj() -> str:
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				{i['syncGroup']} /* SeedScout */,
+				{i['syncGroup']} /* SeedFinder */,
 			);
-			name = SeedScout;
-			productName = SeedScout;
-			productReference = {i['productRef']} /* SeedScout.app */;
+			name = SeedFinder;
+			productName = SeedFinder;
+			productReference = {i['productRef']} /* SeedFinder.app */;
 			productType = "com.apple.product-type.application";
 		}};
 /* End PBXNativeTarget section */
@@ -158,7 +158,7 @@ def pbxproj() -> str:
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				{i['target']} /* SeedScout */,
+				{i['target']} /* SeedFinder */,
 			);
 		}};
 /* End PBXProject section */
@@ -255,8 +255,8 @@ SCHEME = f"""<?xml version="1.0" encoding="UTF-8"?>
          <BuildActionEntry buildForTesting = "YES" buildForRunning = "YES"
             buildForProfiling = "YES" buildForArchiving = "YES" buildForAnalyzing = "YES">
             <BuildableReference BuildableIdentifier = "primary"
-               BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedScout.app"
-               BlueprintName = "SeedScout" ReferencedContainer = "container:SeedScout.xcodeproj">
+               BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedFinder.app"
+               BlueprintName = "SeedFinder" ReferencedContainer = "container:SeedFinder.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -267,8 +267,8 @@ SCHEME = f"""<?xml version="1.0" encoding="UTF-8"?>
       debugDocumentVersioning = "YES" debugServiceExtension = "internal" allowLocationSimulation = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
          <BuildableReference BuildableIdentifier = "primary"
-            BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedScout.app"
-            BlueprintName = "SeedScout" ReferencedContainer = "container:SeedScout.xcodeproj">
+            BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedFinder.app"
+            BlueprintName = "SeedFinder" ReferencedContainer = "container:SeedFinder.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -276,8 +276,8 @@ SCHEME = f"""<?xml version="1.0" encoding="UTF-8"?>
       savedToolIdentifier = "" useCustomWorkingDirectory = "NO" debugDocumentVersioning = "YES">
       <BuildableProductRunnable runnableDebuggingMode = "0">
          <BuildableReference BuildableIdentifier = "primary"
-            BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedScout.app"
-            BlueprintName = "SeedScout" ReferencedContainer = "container:SeedScout.xcodeproj">
+            BlueprintIdentifier = "{IDS['target']}" BuildableName = "SeedFinder.app"
+            BlueprintName = "SeedFinder" ReferencedContainer = "container:SeedFinder.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
@@ -289,12 +289,12 @@ SCHEME = f"""<?xml version="1.0" encoding="UTF-8"?>
 
 def main() -> None:
     root = Path(__file__).resolve().parent
-    proj = root / "SeedScout.xcodeproj"
+    proj = root / "SeedFinder.xcodeproj"
     (proj / "xcshareddata" / "xcschemes").mkdir(parents=True, exist_ok=True)
     (proj / "project.pbxproj").write_text(pbxproj())
-    (proj / "xcshareddata" / "xcschemes" / "SeedScout.xcscheme").write_text(SCHEME)
+    (proj / "xcshareddata" / "xcschemes" / "SeedFinder.xcscheme").write_text(SCHEME)
     print(f"wrote {proj.relative_to(root.parent)}")
-    db = root / "SeedScout" / "Resources" / "seedscout_conus.sqlite"
+    db = root / "SeedFinder" / "Resources" / "seedfinder_conus.sqlite"
     if db.exists():
         print(f"  bundled database: {db.stat().st_size / 1e6:.1f} MB")
     else:

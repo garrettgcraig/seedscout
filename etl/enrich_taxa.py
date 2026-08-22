@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 
-USER_AGENT = "seedscout/0.1 (native seed collection timing)"
+USER_AGENT = "seedfinder/0.1 (native seed collection timing)"
 BATCH = 30
 
 # iNat conservation status codes that should stop a collector.

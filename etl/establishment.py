@@ -19,7 +19,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-USER_AGENT = "seedscout/0.1 (native seed collection timing)"
+USER_AGENT = "seedfinder/0.1 (native seed collection timing)"
 REGIONS = {
     "sbv": dict(swlat=34.0, nelat=35.1, swlng=-120.8, nelng=-118.9),
     "socal": dict(swlat=32.5, nelat=35.1, swlng=-120.8, nelng=-116.5),

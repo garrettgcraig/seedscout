@@ -4,11 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>SeedScout — what has collectible seed near you</title>
+<title>SeedFinder — what has collectible seed near you</title>
 <!-- Matches the Leaflet version already used elsewhere on the site. -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
+  /* Self-hosted rather than linked: this is a field tool and the type should
+     not depend on a CDN reachable from a canyon. Both are variable fonts, so one
+     file covers every weight - Google serves the same file per weight, which is
+     why requesting four gave four identical downloads. */
+  @font-face{font-family:'Fraunces';src:url('fonts/fraunces.woff2') format('woff2-variations');
+    font-weight:100 900;font-display:swap;
+    font-variation-settings:'SOFT' 0,'WONK' 1}
+  @font-face{font-family:'InterVar';src:url('fonts/inter.woff2') format('woff2-variations');
+    font-weight:100 900;font-display:swap}
+
   :root{
     --seed-icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
     --bg:#fbfaf7; --panel:#fff; --ink:#1c1f1a; --muted:#6b7263; --line:#e2e0d6;
@@ -26,10 +36,13 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:16px/1.5 ui-rounded,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font:16px/1.5 'InterVar',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    font-feature-settings:'cv05' 1,'ss03' 1;   /* single-storey l, curved r */
     padding:0 0 3rem;-webkit-text-size-adjust:100%}
   header{padding:1.3rem 1.1rem .6rem;max-width:820px;margin:0 auto}
-  h1{margin:0;font-size:1.5rem;letter-spacing:-.02em}
+  h1{margin:0;font-size:1.6rem;letter-spacing:-.015em;
+    font-family:'Fraunces',Georgia,serif;font-weight:700;
+    font-variation-settings:'SOFT' 0,'WONK' 1,'opsz' 96}
   h1 span{color:var(--accent)}
   .sub{color:var(--muted);font-size:.84rem;margin-top:.25rem}
   main{max-width:820px;margin:0 auto;padding:0 1.1rem}
@@ -171,7 +184,9 @@
     color:var(--muted)}
   .legendmore[open] summary::before{transform:rotate(90deg)}
   .group{margin:1.4rem 0 .6rem;display:flex;align-items:baseline;gap:.5rem}
-  .group h2{margin:0;font-size:.95rem;letter-spacing:-.01em}
+  .group h2{margin:0;font-size:1.02rem;letter-spacing:-.01em;
+    font-family:'Fraunces',Georgia,serif;font-weight:600;
+    font-variation-settings:'opsz' 24}
   .group .n{color:var(--muted);font-size:.8rem}
 
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
@@ -182,7 +197,9 @@
   .head.nophoto{grid-template-columns:1fr auto}
   .thumb{width:56px;height:56px;border-radius:9px;object-fit:cover;background:var(--line);
     border:1px solid var(--line)}
-  .name strong{font-size:1.02rem;letter-spacing:-.01em;display:block}
+  .name strong{font-size:1.06rem;letter-spacing:-.005em;display:block;
+    font-family:'Fraunces',Georgia,serif;font-weight:600;
+    font-variation-settings:'opsz' 20}
   .name em{color:var(--muted);font-style:italic;font-size:.85rem;font-weight:400}
   .when{white-space:nowrap;font-size:.82rem;color:var(--accent);font-weight:700;text-align:right}
   .when.soon{color:var(--warn)} .when.past{color:var(--muted)}
@@ -338,7 +355,7 @@
   </div>
 </div>
 <header>
-  <h1>Seed<span>Scout</span></h1>
+  <h1>Seed<span>Finder</span></h1>
   <div class="sub" id="sub">Loading phenology model…</div>
 </header>
 
@@ -494,12 +511,12 @@
   they show fruit rather than flowers. Handling notes are hand-written, not derived from data.
   <br><br>
   Method, limitations, and source code:
-  <a href="https://github.com/garrettgcraig/seedscout" target="_blank" rel="noopener">github.com/garrettgcraig/seedscout</a>.
+  <a href="https://github.com/garrettgcraig/seedfinder" target="_blank" rel="noopener">github.com/garrettgcraig/seedfinder</a>.
   Observation data from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a>.
 </footer>
 
 <script>
-const DAY = 86400000, CELL = 0.25, LS_KEY = 'seedscout.records.v1';
+const DAY = 86400000, CELL = 0.25, LS_KEY = 'seedfinder.records.v1';
 // The median fitted window is ~47 days. Much beyond 100 and the fit has failed
 // rather than found a long season - usually a species that flowers near
 // year-round, which leaves the flowering anchor meaningless. Past USELESS_WINDOW
@@ -1095,7 +1112,7 @@ function updateRecord(id, path, value){
    Photos live in IndexedDB, not localStorage: a handful of camera images would
    blow the ~5 MB localStorage quota immediately, and blobs there would have to
    be base64'd at a 33% size penalty. Everything is downscaled on the way in. */
-const IDB_NAME = 'seedscout', IDB_STORE = 'photos';
+const IDB_NAME = 'seedfinder', IDB_STORE = 'photos';
 const PHOTO_STAGES = [
   ['specimen', 'Parent plant'],
   ['seed',     'Cleaned seed'],
@@ -1622,7 +1639,7 @@ $('r-export').onclick = () => {
     ];
     return vals.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
   });
-  download('seedscout-records.csv', [cols.join(','), ...rows].join('\n'), 'text/csv');
+  download('seedfinder-records.csv', [cols.join(','), ...rows].join('\n'), 'text/csv');
 };
 $('r-exportj').onclick = async () => {
   // Photo metadata travels with the records; the images themselves are exported
@@ -1635,7 +1652,7 @@ $('r-exportj').onclick = async () => {
     byRec.get(p.rec).push(p);
   }
   const out = records().map(r => ({...r, photos: byRec.get(r.id) || []}));
-  download('seedscout-records.json', JSON.stringify(out, null, 2), 'application/json');
+  download('seedfinder-records.json', JSON.stringify(out, null, 2), 'application/json');
 };
 
 $('r-exportp').onclick = async () => {
@@ -1793,7 +1810,7 @@ addEventListener('resize', fitRail);
 
 /* Collection guidance bar. Hidden once dismissed; the same text still appears in
    the log form, so dismissing it does not remove the guidance from the flow. */
-const ETHICS_KEY = 'seedscout.ethics.dismissed';
+const ETHICS_KEY = 'seedfinder.ethics.dismissed';
 function initEthicsBar(){
   const bar = document.getElementById('ethicsbar');
   if (!bar) return;

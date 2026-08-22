@@ -1,14 +1,14 @@
-# SeedScout
+# SeedFinder
 
 Given a place and a date, which native plants have collectible seed right now?
 
-Live at **[garrettgcraig.com/seedscout](https://garrettgcraig.com/seedscout/)**.
+Live at **[garrettgcraig.com/seedfinder](https://garrettgcraig.com/seedfinder/)**.
 
 Seed-zone tools ([USGS](https://www.usgs.gov/apps/seed-toolkit/),
 [USFS](https://research.fs.usda.gov/pnw/products/dataandtools/seed-zone-webmap)) answer *where* to
 source seed for a restoration site. [USA-NPN](https://www.usanpn.org/data/maps) models fruit
 ripening for a small set of species as gridded maps. Regional harvest charts are hand-curated and
-fixed. SeedScout answers the field question instead: standing here, today, what is ready?
+fixed. SeedFinder answers the field question instead: standing here, today, what is ready?
 
 ## How the window is modelled
 

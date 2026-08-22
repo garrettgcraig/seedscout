@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-USER_AGENT = "seedscout/0.1 (native seed collection timing)"
+USER_AGENT = "seedfinder/0.1 (native seed collection timing)"
 BATCH = 30
 PAUSE = 1.15
 

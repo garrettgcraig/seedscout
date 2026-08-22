@@ -42,7 +42,7 @@ FIELDS = (
 MIN_INTERVAL = 1.05
 MAX_INTERVAL = 6.0
 CLEAN_STREAK = 40          # successes before easing the pace back down
-USER_AGENT = "seedscout/0.1 (native seed collection timing; contact via github)"
+USER_AGENT = "seedfinder/0.1 (native seed collection timing; contact via github)"
 
 _pace = {"interval": MIN_INTERVAL, "clean": 0, "throttled": 0}
 
