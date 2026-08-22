@@ -42,6 +42,12 @@ struct FindView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("SeedFinder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("SeedFinder").font(Typography.display(19))
+                }
+            }
             .navigationDestination(for: Fit.self) {
                 SpeciesDetailView(fit: $0, day: model.dayOfYear,
                                   centre: model.coordinate, radiusKm: model.radiusKm)
