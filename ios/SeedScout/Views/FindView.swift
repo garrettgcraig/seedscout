@@ -5,6 +5,8 @@ import SwiftUI
 struct FindView: View {
     @State private var model = FindModel()
     @State private var location = LocationProvider()
+    @State private var places = PlaceSearch()
+    @State private var placeQuery = ""
     @State private var camera: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 34.4160, longitude: -119.6980),
@@ -62,12 +64,51 @@ struct FindView: View {
         }
         .onChange(of: model.radiusKm) { scheduleRefresh(delay: .zero) }
 
+        placeField
         map
 
         Toggle("Native species only", isOn: $model.nativesOnly)
             .onChange(of: model.nativesOnly) { scheduleRefresh(delay: .zero) }
         Toggle("Only species at this elevation", isOn: $model.matchElevation)
             .onChange(of: model.matchElevation) { scheduleRefresh(delay: .zero) }
+    }
+
+    @ViewBuilder private var placeField: some View {
+        HStack {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("City, park, or address", text: $placeQuery)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onChange(of: placeQuery) { places.search(placeQuery) }
+                .onSubmit { if let first = places.results.first { go(to: first) } }
+            if !placeQuery.isEmpty {
+                Button {
+                    placeQuery = ""
+                    places.clear()
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+
+        ForEach(places.results) { r in
+            Button { go(to: r) } label: {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(r.title).foregroundStyle(.primary)
+                    if !r.subtitle.isEmpty {
+                        Text(r.subtitle).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func go(to result: PlaceSearch.Result) {
+        placeQuery = result.title
+        places.clear()
+        moveTo(result.coordinate, recenter: true)
     }
 
     private var map: some View {
@@ -129,6 +170,9 @@ struct FindView: View {
 
     private func moveTo(_ c: CLLocationCoordinate2D, recenter: Bool) {
         model.coordinate = c
+        // Keep place results biased to wherever the user is now looking.
+        places.region = MKCoordinateRegion(center: c, latitudinalMeters: 200_000,
+                                           longitudinalMeters: 200_000)
         if recenter {
             camera = .region(MKCoordinateRegion(
                 center: c,

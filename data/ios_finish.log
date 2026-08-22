@@ -1,0 +1,18 @@
+=== waiting for download ===
+download process exited
+iOS 26.3.1 (23D8133) - E5297783-8E79-4CA7-A750-FF8D553442D7 (Ready)
+Total Disk Images: 1 (9.7G)
+=== booting ===
+    iPhone 17 Pro (55D36A85-B0A4-42BC-B025-E25018A8BA09) (Booted) 
+=== waiting for springboard ===
+=== install ===
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to lookup in current state: Shutdown
+=== launch ===
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to lookup in current state: Shutdown
+=== screenshot ===
+Detected file type 'PNG' from extension
+An error was encountered processing the command (domain=simctl.SimDisplayScreenshotWriter.ScreenshotError, code=2):
+-rw-r--r--@ 1 garrettcraig  wheel  0 Aug  3 12:10 /tmp/seedscout_ios.png
+=== crash logs? ===

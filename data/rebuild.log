@@ -1,0 +1,28 @@
+=== waiting for elevation ===
+done: 118,614 points at snap 0.05 -> /Users/garrettcraig/Desktop/seedscout/data/elevation_conus.json
+=== rebuilding tiles on FULL dataset ===
+
+  read 6,345,518 unique observations (0 duplicates skipped) -> 256,706 (taxon, tile) pairs
+  merging enrichment for 13,509 taxa
+  merging per-tile establishment for 310 tiles
+
+312 tiles, 96,758 species-tile fits, 84.9 MB total
+  fit levels: {'cell': 11955, 'block': 63103, 'area': 15390, 'wide': 6310}
+  largest tile: 16_-59.json with 1,397 species (1.48 MB)
+=== taxa missing metadata after rebuild ===
+  7,542 taxa in tiles, 13,509 have metadata, 933 missing
+=== fetching metadata for new taxa ===
+
+done: 7,542 taxa detailed
+  family 7,575 | photos 6,022 | tips 4,168 | sensitive 523
+rebuild tiles to pick this up
+=== re-merging metadata into tiles ===
+
+312 tiles, 96,758 species-tile fits, 92.1 MB total
+  fit levels: {'cell': 11955, 'block': 63103, 'area': 15390, 'wide': 6310}
+  largest tile: 16_-59.json with 1,397 species (1.56 MB)
+=== compiling SQLite for iOS ===
+  building indexes and FTS
+
+done: 7,542 taxa, 96,758 fits, 395,287 cells, 7,063 photos, 1,152,991 obs points -> seedscout_conus.sqlite (77.3 MB)
+=== REBUILD DONE ===

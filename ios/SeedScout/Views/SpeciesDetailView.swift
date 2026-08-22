@@ -9,6 +9,8 @@ struct SpeciesDetailView: View {
     let centre: CLLocationCoordinate2D
     let radiusKm: Double
 
+    @Environment(RecordStore.self) private var records
+    @State private var loggingLot: SeedLot?
     @State private var photos: [Photo] = []
     @State private var tips: Tips?
     private let store = try? SpeciesStore()
@@ -60,6 +62,8 @@ struct SpeciesDetailView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .bottom) { logBar }
+        .sheet(item: $loggingLot) { AddLotSheet(prefill: $0) }
         .navigationTitle(fit.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -69,6 +73,28 @@ struct SpeciesDetailView: View {
             photos = await p ?? []
             tips = await t ?? nil
         }
+    }
+
+    /// Pinned rather than placed at the end of the list: you are standing at the
+    /// plant, and it should not require scrolling past the field notes to reach.
+    private var logBar: some View {
+        Button {
+            var lot = SeedLot(taxonID: fit.taxonID, species: fit.name,
+                              common: fit.common, date: ISO.string(Date()))
+            lot.lat = centre.latitude
+            lot.lng = centre.longitude
+            loggingLot = lot
+        } label: {
+            Label("Log a collection of this species", systemImage: "plus")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 13)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Color.seedAccent)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+        .background(.bar)
     }
 
     private var photoStrip: some View {

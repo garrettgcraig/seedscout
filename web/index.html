@@ -55,6 +55,17 @@
   button.ghost{background:var(--bg);color:var(--ink);border-color:var(--line);font-weight:500}
   /* The point of a species page: you are standing at the plant. Previously this
      used .ghost and read as a footnote. */
+  /* Where this species has actually been recorded in fruit. The ranked list
+     answers "is it around here"; this answers "where do I walk". */
+  .obsmap{height:230px;border-radius:11px;border:1px solid var(--line);margin-top:.7rem;
+    background:var(--bg);z-index:0}
+  .obsbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+    margin-top:.4rem;font-size:.76rem;color:var(--muted)}
+  .obsbar label{display:flex;align-items:center;gap:.4rem;text-transform:none;
+    letter-spacing:0;font-weight:500;font-size:.76rem;margin:0;color:var(--muted)}
+  .obsbar input{width:auto;margin:0}
+  .obscount{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .obsnote{font-size:.76rem;color:var(--muted);font-style:italic;margin-top:.4rem}
   .logbtn{margin-top:1rem;width:100%;display:flex;align-items:center;justify-content:center;
     gap:.45rem;padding:.85rem 1rem;font-size:.95rem;font-weight:700;letter-spacing:-.01em;
     border:0;border-radius:12px;background:var(--accent);color:#fff;
@@ -743,7 +754,12 @@ function card(t, local, c, today){
   detail.className = 'detail hidden';
   detail.innerHTML = detailHTML(t);
   el.append(detail);
-  el.querySelector('.head').onclick = () => detail.classList.toggle('hidden');
+  el.querySelector('.head').onclick = () => {
+    detail.classList.toggle('hidden');
+    // Built on first open, not on render: a results list holds sixty of these
+    // and each map is a live Leaflet instance.
+    if (!detail.classList.contains('hidden')) mountObsMap(detail, t);
+  };
 
   const btn = detail.querySelector('.logbtn');
   if (btn) btn.onclick = () => {
@@ -752,6 +768,92 @@ function card(t, local, c, today){
     showTab('log'); window.scrollTo({top:0, behavior:'smooth'});
   };
   return el;
+}
+
+/* ---------- observation points ----------
+   Sidecar tiles on the same 2 degree grid as the phenology tiles, fetched only
+   when a species detail is opened. iOS reads the equivalent rows from its
+   bundled SQLite `obs` table; both show the same thing. */
+const OBS_ROOT = 'obs_conus';
+const OBS_CACHE = new Map();
+
+async function obsTile(lat, lng){
+  const D = TILE_INDEX?.tile_deg ?? 2;
+  const key = `${Math.floor(lat/D)}_${Math.floor(lng/D)}`;
+  if (!OBS_CACHE.has(key)){
+    OBS_CACHE.set(key, fetch(`${OBS_ROOT}/${key}.json`)
+      .then(r => r.ok ? r.json() : {})
+      .catch(() => ({})));
+  }
+  return OBS_CACHE.get(key);
+}
+
+/// Fruiting points for one taxon within the search radius, optionally limited to
+/// records from the same part of the year as the selected date.
+async function obsPoints(taxonId, lat, lng, km, seasonOnly, today){
+  // A radius can straddle a tile edge, so gather every tile it touches.
+  const D = TILE_INDEX?.tile_deg ?? 2;
+  const pad = km / 111 + 0.02;
+  const keys = new Set();
+  for (const dLat of [-pad, 0, pad]) for (const dLng of [-pad, 0, pad])
+    keys.add(`${Math.floor((lat+dLat)/D)}_${Math.floor((lng+dLng)/D)}`);
+
+  const tiles = await Promise.all([...keys].map(async k => {
+    if (!OBS_CACHE.has(k)){
+      OBS_CACHE.set(k, fetch(`${OBS_ROOT}/${k}.json`)
+        .then(r => r.ok ? r.json() : {}).catch(() => ({})));
+    }
+    return OBS_CACHE.get(k);
+  }));
+
+  const out = [];
+  for (const t of tiles){
+    for (const [la, ln, doy] of (t[String(taxonId)] || [])){
+      if (haversine(lat, lng, la, ln) > km) continue;
+      // Circular distance, so a window spanning New Year still works.
+      if (seasonOnly && Math.min(ahead(doy, today), ahead(today, doy)) > 45) continue;
+      out.push([la, ln, doy]);
+    }
+  }
+  return out;
+}
+
+/// Draw the observation map into an already-rendered detail panel.
+async function mountObsMap(detail, t){
+  const host = detail.querySelector('.obsmap');
+  if (!host || typeof L === 'undefined' || host.dataset.mounted) return;
+  host.dataset.mounted = '1';
+
+  const today = doy(new Date($('date').value + 'T12:00'));
+  const km = +$('radius').value;
+  const map = L.map(host, {zoomControl: true, attributionControl: false, scrollWheelZoom: false});
+  L.tileLayer(CARTO(prefersDark()), {maxZoom: 19}).addTo(map);
+  L.circleMarker([POS.lat, POS.lng], {radius: 5, weight: 2.5, color: '#3f6b2e',
+    fillColor: 'var(--panel)', fillOpacity: 1}).addTo(map);
+
+  let layer = L.layerGroup().addTo(map);
+  const cb = detail.querySelector('.obsseason');
+  const count = detail.querySelector('.obscount');
+  const note = detail.querySelector('.obsnote');
+
+  const draw = async () => {
+    const pts = await obsPoints(t.taxon_id, POS.lat, POS.lng, km, cb.checked, today);
+    layer.clearLayers();
+    for (const [la, ln] of pts){
+      L.circleMarker([la, ln], {radius: 4, weight: 0.5, color: '#3f6b2e',
+        fillColor: '#3f6b2e', fillOpacity: .55}).addTo(layer);
+    }
+    count.textContent = `${pts.length} record${pts.length === 1 ? '' : 's'}`;
+    note.textContent = pts.length ? '' : (cb.checked
+      ? `No fruiting records within ${km} km at this time of year. Untick to see any season.`
+      : `No fruiting records within ${km} km.`);
+    const bounds = L.latLngBounds([[POS.lat, POS.lng], ...pts.map(p => [p[0], p[1]])]);
+    map.fitBounds(bounds, {padding: [18, 18], maxZoom: 13});
+  };
+  cb.onchange = draw;
+  await draw();
+  // Leaflet mis-measures a container that was display:none when created.
+  setTimeout(() => map.invalidateSize(), 60);
 }
 
 function detailHTML(t){
@@ -784,6 +886,14 @@ function detailHTML(t){
       from ${t.n_fruit} fruiting and ${t.n_flower} flowering records.
       ${t.flower_to_ripe_days != null ? `Roughly ${t.flower_to_ripe_days} days after peak bloom.` : ''}
     </dd></div></dl>
+    <div class="obswrap">
+      <div class="obsmap"></div>
+      <div class="obsbar">
+        <label><input type="checkbox" class="obsseason" checked> Only records from this time of year</label>
+        <span class="obscount">…</span>
+      </div>
+      <div class="obsnote"></div>
+    </div>
     <button class="logbtn">Log a collection of this species</button>`;
 }
 

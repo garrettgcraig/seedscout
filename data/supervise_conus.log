@@ -1,1 +1,17 @@
 2026-08-02 15:21:04 not running - starting (restart #1)
+2026-08-02 22:56:14 stalled 5026s with no progress - restarting
+etl/supervise_fetch.sh: line 49:  1411 Terminated: 15          nohup python3 etl/fetch_inat.py "$REGION" >> "$LOG" 2>&1
+2026-08-02 22:56:19 not running - starting (restart #2)
+2026-08-03 00:58:14 stalled 12346s with no progress - restarting
+etl/supervise_fetch.sh: line 49:  8762 Terminated: 15          nohup python3 etl/fetch_inat.py "$REGION" >> "$LOG" 2>&1
+2026-08-03 00:58:19 not running - starting (restart #3)
+2026-08-03 01:59:36 stalled 3672s with no progress - restarting
+etl/supervise_fetch.sh: line 49:  8818 Terminated: 15          nohup python3 etl/fetch_inat.py "$REGION" >> "$LOG" 2>&1
+2026-08-03 03:59:37 not running - starting (restart #4)
+2026-08-03 05:59:53 stalled 7196s with no progress - restarting
+etl/supervise_fetch.sh: line 49:  8861 Terminated: 15          nohup python3 etl/fetch_inat.py "$REGION" >> "$LOG" 2>&1
+2026-08-03 05:59:59 not running - starting (restart #5)
+2026-08-03 08:01:07 stalled 7263s with no progress - restarting
+etl/supervise_fetch.sh: line 49:  8886 Terminated: 15          nohup python3 etl/fetch_inat.py "$REGION" >> "$LOG" 2>&1
+2026-08-03 08:01:13 not running - starting (restart #6)
+2026-08-03 23:55:10 fetch complete after 6 restart(s)
