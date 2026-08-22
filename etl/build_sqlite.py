@@ -262,7 +262,7 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     root = Path(__file__).resolve().parents[1]
-    out = args.out or root / "ios" / "SeedScout" / "Resources" / f"seedscout_{args.region}.sqlite"
+    out = args.out or root / "ios" / "SeedFinder" / "Resources" / f"seedfinder_{args.region}.sqlite"
     out.parent.mkdir(parents=True, exist_ok=True)
     build(root / "web" / f"tiles_{args.region}", out,
           root / "data" / f"obs_{args.region}.jsonl")
