@@ -293,18 +293,23 @@
        ethics note and legend to scroll away, which is the opposite of what a
        sidebar is for. The whole column scrolls internally when it is taller
        than the viewport, so nothing becomes unreachable on a short screen. */
+    /* One pane, not a stack of cards: the rail carries the panel chrome and its
+       children are regions inside it, separated by a rule rather than a gap.
+       overflow:hidden keeps the scrolling region from bleeding past the rounded
+       corners. */
     .rail{position:sticky;top:1rem;max-height:var(--rail-max, calc(100vh - 2rem));
-      display:flex;flex-direction:column;gap:1rem;min-height:0}
-    /* The ethics note and the legend are reference material you want in view
-       while reading results, so they hold their place at the bottom of the rail
-       and never scroll. Only the controls give way when the column is taller
-       than the viewport - they are the part you have already used. */
-    /* A floor on the controls: the map is the main input, and letting the
-       pinned panels below squeeze it to a sliver traded one problem for a
-       worse one. */
+      display:flex;flex-direction:column;min-height:0;
+      background:var(--panel);border:1px solid var(--line);
+      border-radius:var(--radius);overflow:hidden}
+    /* The legend is reference material you want in view while reading results,
+       so it holds its place at the bottom. Only the controls give way when the
+       pane is taller than the viewport - they are the part you have already
+       used - and they keep a floor so the map is never squeezed to a sliver. */
     .rail > .controls{flex:1 1 auto;min-height:340px;overflow-y:auto;
-      overscroll-behavior:contain;scrollbar-width:thin}
-    .rail > .ethics, .rail > .legend{flex:none;margin:0}
+      overscroll-behavior:contain;scrollbar-width:thin;
+      background:none;border:0;border-radius:0;margin:0}
+    .rail > .legend{flex:none;margin:0;background:none;border:0;border-radius:0;
+      border-top:1px solid var(--line)}
     #pane-find > #out{margin-top:0}
     #pane-log{max-width:760px}
     /* The first results heading should line up with the top of the rail. */
