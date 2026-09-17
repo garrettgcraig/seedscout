@@ -304,7 +304,7 @@
      being stretched across the full window. */
   @media (min-width: 1000px){
     header, main, footer{max-width:1180px}
-    #pane-find{display:grid;grid-template-columns:340px minmax(0, 1fr);
+    #pane-find:not(.hidden){display:grid;grid-template-columns:340px minmax(0, 1fr);
       gap:1.4rem;align-items:start}
     /* The rail sticks as one piece. Making only .controls sticky left the
        ethics note and legend to scroll away, which is the opposite of what a
