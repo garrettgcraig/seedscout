@@ -683,9 +683,15 @@ async function load(){
 }
 
 /* ---------- map picker ---------- */
-const CARTO = dark =>
-  `https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`;
-const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+// Shared by the picker and observation maps. Browser caching follows the
+// provider's headers; tiles are loaded only for interactive map viewing.
+const BASEMAP_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+function basemapLayer(){
+  return L.tileLayer(BASEMAP_URL, {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  });
+}
 
 function initMap(){
   // A field tool has to survive having no network. If Leaflet did not load,
@@ -701,9 +707,7 @@ function initMap(){
   }
   MAP = L.map('map', {zoomControl: true, attributionControl: true})
          .setView([POS.lat, POS.lng], 10);
-  TILES = L.tileLayer(CARTO(prefersDark()), {
-    maxZoom: 19, attribution: '&copy; <a href="https://carto.com/">CARTO</a>, OpenStreetMap',
-  }).addTo(MAP);
+  TILES = basemapLayer().addTo(MAP);
 
   PIN = L.marker([POS.lat, POS.lng], {draggable: true, autoPan: true}).addTo(MAP);
   RING = L.circle([POS.lat, POS.lng], {
@@ -738,9 +742,6 @@ function initMap(){
   });
   MAP.addControl(new Locate());
 
-  // Follow the OS theme so the basemap never fights the page.
-  matchMedia('(prefers-color-scheme: dark)')
-    .addEventListener('change', () => TILES.setUrl(CARTO(prefersDark())));
   fitRing();
 }
 
@@ -932,8 +933,8 @@ async function mountObsMap(detail, t){
 
   const today = doy(new Date($('date').value + 'T12:00'));
   const km = +$('radius').value;
-  const map = L.map(host, {zoomControl: true, attributionControl: false, scrollWheelZoom: false});
-  L.tileLayer(CARTO(prefersDark()), {maxZoom: 19}).addTo(map);
+  const map = L.map(host, {zoomControl: true, attributionControl: true, scrollWheelZoom: false});
+  basemapLayer().addTo(map);
   L.circleMarker([POS.lat, POS.lng], {radius: 5, weight: 2.5, color: '#3f6b2e',
     fillColor: 'var(--panel)', fillOpacity: 1}).addTo(map);
 
