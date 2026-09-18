@@ -16,10 +16,14 @@ struct SeedLot: Identifiable, Codable, Hashable {
     var elevation: Int?
     var quantity: String?
     var notes: String?
+    var parentID: String?
+    var batchName: String?
+    var seedCount: Int?
     var prop = Propagation()
 
     enum CodingKeys: String, CodingKey {
         case id, species, common, date, lat, lng, elevation, quantity, notes, prop
+        case parentID, batchName, seedCount
         case taxonID = "taxon_id"
     }
 
@@ -29,6 +33,17 @@ struct SeedLot: Identifiable, Codable, Hashable {
     }
 
     var displayName: String { common?.capitalizedFirst ?? species }
+    var batchCode: String { "SF-" + id.suffix(8).uppercased() }
+
+    func treatmentBatch(name: String, count: Int) -> SeedLot {
+        var child = SeedLot(taxonID: taxonID, species: species, common: common, date: date)
+        child.parentID = id
+        child.batchName = name
+        child.seedCount = count
+        child.quantity = "\(count) seeds"
+        child.lat = lat; child.lng = lng; child.elevation = elevation
+        return child
+    }
 }
 
 struct Propagation: Codable, Hashable {
@@ -37,6 +52,13 @@ struct Propagation: Codable, Hashable {
     var stratify = Stratification()
     var sown = Sowing()
     var germ = Germination()
+    var planted: Planting?
+
+    struct Planting: Codable, Hashable {
+        var date: String?
+        var count: Int?
+        var location: String?
+    }
 
     struct Storage: Codable, Hashable {
         var method: String?
@@ -59,6 +81,83 @@ struct Propagation: Codable, Hashable {
     struct Germination: Codable, Hashable {
         var date: String?
         var count: Int?
+    }
+}
+
+// Older web exports omit untouched sections and store numeric inputs as strings.
+extension SeedLot {
+    private enum LegacyKeys: String, CodingKey { case elev, qty }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let old = try decoder.container(keyedBy: LegacyKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        species = try c.decode(String.self, forKey: .species)
+        date = try c.decode(String.self, forKey: .date)
+        common = try c.decodeIfPresent(String.self, forKey: .common)
+        taxonID = try c.decodeIfPresent(Int.self, forKey: .taxonID)
+        lat = try c.decodeIfPresent(Double.self, forKey: .lat)
+        lng = try c.decodeIfPresent(Double.self, forKey: .lng)
+        elevation = try c.decodeIfPresent(Int.self, forKey: .elevation)
+            ?? old.decodeIfPresent(Double.self, forKey: .elev).map { Int($0) }
+        quantity = try c.decodeIfPresent(String.self, forKey: .quantity)
+            ?? old.decodeIfPresent(String.self, forKey: .qty)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes)
+        parentID = try c.decodeIfPresent(String.self, forKey: .parentID)
+        batchName = try c.decodeIfPresent(String.self, forKey: .batchName)
+        seedCount = try c.decodeIfPresent(Int.self, forKey: .seedCount)
+        prop = try c.decodeIfPresent(Propagation.self, forKey: .prop) ?? Propagation()
+    }
+}
+
+extension Propagation {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        storage = try c.decodeIfPresent(Storage.self, forKey: .storage) ?? Storage()
+        scarify = try c.decodeIfPresent(Treatment.self, forKey: .scarify) ?? Treatment()
+        stratify = try c.decodeIfPresent(Stratification.self, forKey: .stratify) ?? Stratification()
+        sown = try c.decodeIfPresent(Sowing.self, forKey: .sown) ?? Sowing()
+        germ = try c.decodeIfPresent(Germination.self, forKey: .germ) ?? Germination()
+        planted = try c.decodeIfPresent(Planting.self, forKey: .planted)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func legacyInt(_ key: Key) throws -> Int? {
+        if try decodeNilIfPresent(key) { return nil }
+        if let n = try? decode(Int.self, forKey: key) { return n }
+        let s = try decode(String.self, forKey: key)
+        guard !s.isEmpty else { return nil }
+        guard let n = Int(s) else {
+            throw DecodingError.dataCorruptedError(forKey: key, in: self, debugDescription: "Invalid integer")
+        }
+        return n
+    }
+    func decodeNilIfPresent(_ key: Key) throws -> Bool {
+        if !contains(key) { return true }
+        return try decodeNil(forKey: key)
+    }
+}
+extension Propagation.Stratification {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        method = try c.decodeIfPresent(String.self, forKey: .method)
+        start = try c.decodeIfPresent(String.self, forKey: .start)
+        days = try c.legacyInt(.days)
+    }
+}
+extension Propagation.Sowing {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decodeIfPresent(String.self, forKey: .date)
+        medium = try c.decodeIfPresent(String.self, forKey: .medium)
+        count = try c.legacyInt(.count)
+    }
+}
+extension Propagation.Germination {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        date = try c.decodeIfPresent(String.self, forKey: .date)
+        count = try c.legacyInt(.count)
     }
 }
 
@@ -143,7 +242,7 @@ extension SeedLot {
             let end = Calendar.current.date(byAdding: .day, value: days, to: start) ?? start
             lc.stratEnd = end
             let left = Calendar.current.dateComponents([.day], from: today, to: end).day ?? 0
-            lc.daysLeft = left
+            lc.daysLeft = prop.sown.date == nil ? left : nil
             if prop.sown.date == nil {
                 lc.stages.append(left > 0 ? .stratifying(daysLeft: left, ends: end)
                                           : .readyToSow(since: -left))
@@ -154,9 +253,11 @@ extension SeedLot {
             lc.stages.append(.sown(sownDate))
             let sown = prop.sown.count ?? 0
             let up = prop.germ.count ?? 0
-            if let gDate = ISO.date(prop.germ.date), let sDate = ISO.date(sownDate), sown > 0 {
+            if prop.germ.count != nil, sown > 0 {
                 lc.rate = Double(up) / Double(sown)
-                lc.daysToGerminate = Calendar.current.dateComponents([.day], from: sDate, to: gDate).day
+                if let gDate = ISO.date(prop.germ.date), let sDate = ISO.date(sownDate) {
+                    lc.daysToGerminate = Calendar.current.dateComponents([.day], from: sDate, to: gDate).day
+                }
                 lc.stages.append(.germinated(rate: lc.rate!, days: lc.daysToGerminate ?? 0))
             }
         }

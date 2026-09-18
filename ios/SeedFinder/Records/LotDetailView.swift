@@ -8,11 +8,20 @@ struct LotDetailView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var pickerStage: PhotoStage = .specimen
     @State private var showCamera = false
+    @State private var batchName = ""
+    @State private var batchCount = ""
 
     var body: some View {
         List {
             Section("Collection") {
                 LabeledContent("Species", value: lot.species)
+                LabeledContent("Batch ID", value: lot.batchCode)
+                if let parent = lot.parentID {
+                    LabeledContent("Source collection", value: "SF-" + parent.suffix(8).uppercased())
+                }
+                if lot.parentID != nil {
+                    TextField("Treatment name", text: binding(\.batchName))
+                }
                 LabeledContent("Collected", value: lot.date)
                 if let e = lot.elevation { LabeledContent("Elevation", value: "\(e) m") }
                 if let lat = lot.lat, let lng = lot.lng {
@@ -24,12 +33,41 @@ struct LotDetailView: View {
 
             schedule
             photoSection
+            if lot.parentID == nil {
+                Section("Treatment batches") {
+                    ForEach(store.lots.filter { $0.parentID == lot.id }) { child in
+                        NavigationLink {
+                            LotDetailView(lot: child)
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(child.batchName ?? child.batchCode)
+                                Text("\(child.batchCode) · \(child.seedCount ?? 0) seeds")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    TextField("Treatment name (e.g. untreated)", text: $batchName)
+                    TextField("Seeds allocated", text: $batchCount).keyboardType(.numberPad)
+                    Button("Create treatment batch") {
+                        guard let n = Int(batchCount), n > 0 else { return }
+                        store.add(lot.treatmentBatch(name: batchName.trimmingCharacters(in: .whitespaces), count: n))
+                        batchName = ""; batchCount = ""
+                    }
+                    .disabled(batchName.trimmingCharacters(in: .whitespaces).isEmpty || (Int(batchCount) ?? 0) < 1)
+                    Text("Each treatment starts with its own propagation details and photos. Existing details stay with this collection.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            if let error = store.loadError { Text(error).foregroundStyle(.red) }
         }
         .navigationTitle(lot.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: lot) { store.update(lot) }
-        .photosPicker(isPresented: .constant(pickerItem == nil ? false : true),
-                      selection: $pickerItem, matching: .images)
+        .sheet(isPresented: $showCamera) {
+            SpecimenCamera { img in
+                store.addPhoto(img, to: lot, stage: pickerStage)
+            }
+        }
     }
 
     // MARK: - Propagation
@@ -80,7 +118,7 @@ struct LotDetailView: View {
 
         Section("Sowing") {
             dateRow("Sown", binding(\.prop.sown.date))
-            Stepper(value: intBinding(\.prop.sown.count), in: 0...100_000, step: 10) {
+            Stepper(value: intBinding(\.prop.sown.count), in: (lot.prop.germ.count ?? 0)...max(lot.seedCount ?? 100_000, lot.prop.germ.count ?? 0), step: 1) {
                 LabeledContent("Seeds sown", value: (lot.prop.sown.count ?? 0) == 0
                                ? "—" : "\(lot.prop.sown.count ?? 0)")
             }
@@ -89,7 +127,7 @@ struct LotDetailView: View {
 
         Section {
             dateRow("First germination", binding(\.prop.germ.date))
-            Stepper(value: intBinding(\.prop.germ.count), in: 0...100_000, step: 5) {
+            Stepper(value: intBinding(\.prop.germ.count), in: 0...(lot.prop.sown.count ?? 100_000), step: 1) {
                 LabeledContent("Seedlings", value: (lot.prop.germ.count ?? 0) == 0
                                ? "—" : "\(lot.prop.germ.count ?? 0)")
             }
@@ -103,6 +141,20 @@ struct LotDetailView: View {
             }
         } header: {
             Text("Germination")
+        }
+        Section("Planted out") {
+            TextField("Garden location", text: Binding(
+                get: { lot.prop.planted?.location ?? "" },
+                set: { if lot.prop.planted == nil { lot.prop.planted = .init() }; lot.prop.planted?.location = $0 }
+            ))
+            dateRow("Planted", Binding(
+                get: { lot.prop.planted?.date ?? "" },
+                set: { if lot.prop.planted == nil { lot.prop.planted = .init() }; lot.prop.planted?.date = $0.isEmpty ? nil : $0 }
+            ))
+            TextField("Plants planted", value: Binding(
+                get: { lot.prop.planted?.count },
+                set: { if lot.prop.planted == nil { lot.prop.planted = .init() }; lot.prop.planted?.count = $0.map { max(0, $0) } }
+            ), format: .number).keyboardType(.numberPad)
         }
     }
 
@@ -148,6 +200,9 @@ struct LotDetailView: View {
                     pickerItem = nil
                 }
             }
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Take photo", systemImage: "camera") { showCamera = true }
+            }
         } header: {
             Text("Photos")
         } footer: {
@@ -158,10 +213,18 @@ struct LotDetailView: View {
     // MARK: - Bindings
 
     private func dateRow(_ label: String, _ text: Binding<String>) -> some View {
-        DatePicker(label, selection: Binding(
-            get: { ISO.date(text.wrappedValue) ?? Date() },
-            set: { text.wrappedValue = ISO.string($0) }
-        ), displayedComponents: .date)
+        VStack(alignment: .leading) {
+            Toggle(label, isOn: Binding(
+                get: { !text.wrappedValue.isEmpty },
+                set: { text.wrappedValue = $0 ? ISO.string(Date()) : "" }
+            ))
+            if !text.wrappedValue.isEmpty {
+                DatePicker(label, selection: Binding(
+                    get: { ISO.date(text.wrappedValue) ?? Date() },
+                    set: { text.wrappedValue = ISO.string($0) }
+                ), displayedComponents: .date)
+            }
+        }
     }
 
     private func binding(_ kp: WritableKeyPath<SeedLot, String?>) -> Binding<String> {
@@ -176,6 +239,6 @@ struct LotDetailView: View {
 
     private func intBinding(_ kp: WritableKeyPath<SeedLot, Int?>) -> Binding<Int> {
         Binding(get: { lot[keyPath: kp] ?? 0 },
-                set: { lot[keyPath: kp] = $0 == 0 ? nil : $0 })
+                set: { lot[keyPath: kp] = $0 })
     }
 }

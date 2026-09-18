@@ -52,6 +52,7 @@ TARGET_BUILD = f"""
 				MARKETING_VERSION = 1.0;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = SeedFinder;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Photograph collected plants and growing stages for your local seed records.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "{LOCATION_PURPOSE}";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";

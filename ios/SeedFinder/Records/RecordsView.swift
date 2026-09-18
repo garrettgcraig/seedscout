@@ -13,6 +13,7 @@ struct RecordsView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let error = store.loadError { Text(error).foregroundStyle(.red) }
                 if !store.needingAttention.isEmpty { attention }
 
                 if store.lots.isEmpty {
@@ -119,6 +120,8 @@ private struct LotRow: View {
                 Text(lot.date).font(.caption).foregroundStyle(.secondary)
             }
             Text(lot.species).font(.caption).italic().foregroundStyle(.secondary)
+            Text("\(lot.batchCode) · \(lot.batchName ?? "Collection")")
+                .font(.caption).foregroundStyle(.secondary)
             FlowRow(spacing: 5) {
                 ForEach(Array(lc.stages.enumerated()), id: \.offset) { _, stage in
                     stageTag(stage)

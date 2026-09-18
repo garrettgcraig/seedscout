@@ -60,17 +60,25 @@ final class RecordStore {
     // MARK: - Lots
 
     func add(_ lot: SeedLot) {
+        if lots.contains(where: { $0.id == lot.id }) { update(lot); return }
         lots.insert(lot, at: 0)
         save()
+        if loadError != nil { lots.removeAll { $0.id == lot.id } }
     }
 
     func update(_ lot: SeedLot) {
         guard let i = lots.firstIndex(where: { $0.id == lot.id }) else { return }
+        let previous = lots[i]
         lots[i] = lot
         save()
+        if loadError != nil { lots[i] = previous }
     }
 
     func delete(_ lot: SeedLot) {
+        guard !lots.contains(where: { $0.parentID == lot.id }) else {
+            loadError = "Delete linked treatment batches before deleting their source collection."
+            return
+        }
         lots.removeAll { $0.id == lot.id }
         for p in photos where p.lotID == lot.id {
             try? FileManager.default.removeItem(at: imagesDir.appendingPathComponent(p.file))
@@ -150,9 +158,15 @@ final class RecordStore {
     @discardableResult
     func importJSON(_ data: Data) throws -> Int {
         struct Bundle: Decodable { let records: [SeedLot] }
-        let incoming = try JSONDecoder().decode(Bundle.self, from: data).records
-        let known = Set(lots.map(\.id))
-        let fresh = incoming.filter { !known.contains($0.id) }
+        let decoder = JSONDecoder()
+        let incoming: [SeedLot]
+        if let array = try? decoder.decode([SeedLot].self, from: data) {
+            incoming = array
+        } else {
+            incoming = try decoder.decode(Bundle.self, from: data).records
+        }
+        var known = Set(lots.map(\.id))
+        let fresh = incoming.filter { known.insert($0.id).inserted }
         lots.insert(contentsOf: fresh, at: 0)
         save()
         return fresh.count
@@ -168,7 +182,8 @@ final class RecordStore {
                     "storage_method", "storage_date", "scarify_method", "scarify_date",
                     "stratify_method", "stratify_start", "stratify_days",
                     "sown_date", "sown_count", "sown_medium", "germ_date", "germ_count",
-                    "stratify_end", "germination_rate", "days_to_germination"]
+                    "stratify_end", "germination_rate", "days_to_germination",
+                    "parentID", "batchName", "seedCount", "planted_date", "planted_count", "planted_location"]
 
         func esc(_ v: Any?) -> String {
             let s = v.map { "\($0)" } ?? ""
@@ -200,6 +215,8 @@ final class RecordStore {
                 esc(lc.stratEnd.map(ISO.string)),
                 esc(lc.rate.map { String(format: "%.3f", $0) }),
                 esc(lc.daysToGerminate),
+                esc(lot.parentID), esc(lot.batchName), esc(lot.seedCount),
+                esc(p.planted?.date), esc(p.planted?.count), esc(p.planted?.location),
             ].joined(separator: ","))
         }
         return out.joined(separator: "\n")

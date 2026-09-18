@@ -28,7 +28,8 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
     }
 
     @MainActor
-    func current() async throws -> CLLocationCoordinate2D {
+    func current(precise: Bool = false) async throws -> CLLocationCoordinate2D {
+        manager.desiredAccuracy = precise ? kCLLocationAccuracyBest : kCLLocationAccuracyReduced
         if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
             state = .denied
             throw Failure.denied

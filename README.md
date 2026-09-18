@@ -4,6 +4,26 @@ Given a place and a date, which native plants have collectible seed right now?
 
 Live at **[garrettgcraig.com/seedfinder](https://garrettgcraig.com/seedfinder/)**.
 
+## Collection and propagation records
+
+Log a collection from a species page with the species and today's date filled in.
+GPS, the search map pin, quantity, notes, and a parent-plant photo are optional.
+On web, collection entry opens in a compact dialog; on iOS, it opens in a sheet.
+
+Each collection has a batch ID. Create named treatment batches with allocated seed
+counts, such as 10 scarified seeds and 10 untreated seeds. Batches link to the source
+collection and independently track storage, scarification, stratification, sowing,
+germination counts, photos, and planted-out dates, counts, and garden locations.
+Existing source propagation details are retained; new treatments start empty.
+Allocation totals describe the batches entered, rather than deducting from a
+collection quantity entered as free text.
+
+Web records stay in browser localStorage and photos in IndexedDB. iOS stores records
+and photos in private app files. There is no automatic cloud synchronization.
+CSV and JSON exports include treatment IDs and parent links. Photo files are separate
+from JSON metadata; web offers a separate photo download. The iOS importer accepts
+both web record arrays and iOS export bundles, including older records without batches.
+
 Seed-zone tools ([USGS](https://www.usgs.gov/apps/seed-toolkit/),
 [USFS](https://research.fs.usda.gov/pnw/products/dataandtools/seed-zone-webmap)) answer *where* to
 source seed for a restoration site. [USA-NPN](https://www.usanpn.org/data/maps) models fruit
