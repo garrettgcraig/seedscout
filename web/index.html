@@ -345,6 +345,11 @@
     color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem}
   dialog::backdrop{background:rgba(0,0,0,.6)}
   dialog .controls{border:0;padding:0;margin:0}
+  .collection-map-wrap{position:relative;margin:.5rem 0}
+  #r-map{height:220px;border-radius:10px;overflow:hidden;z-index:0}
+  #r-here{position:absolute;right:10px;top:10px;z-index:1;width:40px;height:40px;
+    padding:8px;background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+  #r-here svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2}
 </style>
 </head>
 <body>
@@ -459,12 +464,19 @@
       </div>
       <div>
         <label>Where it was collected</label>
+        <div class="collection-map-wrap">
+          <div id="r-map" aria-label="Collection location map"></div>
+          <button id="r-here" type="button" title="Find my location" aria-label="Find my collection location">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="1.5"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+          </button>
+        </div>
+        <div class="hint" id="r-map-hint">Tap the map to place a collection pin, or use the target for your current location.</div>
         <div class="coords" style="margin-bottom:.45rem">
           <span><b id="r-coordtext">not set</b></span>
         </div>
         <div class="row">
-          <button id="r-here" class="ghost">Use my GPS</button>
-          <button id="r-frommap" class="ghost">Use map pin</button>
+          <button id="r-frommap" class="ghost">Use search map pin</button>
         </div>
       </div>
       <div><label for="r-notes">Notes</label>
@@ -1135,6 +1147,7 @@ function openCollection(species = ''){
   if (species) $('r-species').value = species;
   $('r-date').value = isoDate(new Date());
   $('collection-dialog').showModal();
+  mountCollectionMap();
 }
 $('r-new').onclick = () => openCollection();
 $('r-cancel').onclick = () => $('collection-dialog').close();
@@ -1645,10 +1658,38 @@ $('r-camera').addEventListener('change', collectPhoto);
 
 // Pending location for the record form, set by GPS or copied from the map pin.
 let REC_POS = null;
+let COLLECTION_MAP = null, COLLECTION_PIN = null;
+function mountCollectionMap(){
+  if (typeof L === 'undefined'){
+    $('r-map').textContent = 'Map unavailable. You can still use GPS or the search map pin.';
+    return;
+  }
+  if (!COLLECTION_MAP){
+    COLLECTION_MAP = L.map('r-map', {scrollWheelZoom:false});
+    basemapLayer().addTo(COLLECTION_MAP);
+    COLLECTION_MAP.on('click', e => setRecPos(e.latlng.lat, e.latlng.lng));
+  }
+  const centre = REC_POS || POS;
+  COLLECTION_MAP.setView([centre.lat, centre.lng], REC_POS ? 15 : 12);
+  if (!REC_POS && COLLECTION_PIN) { COLLECTION_PIN.remove(); COLLECTION_PIN = null; }
+  if (REC_POS) setRecPos(REC_POS.lat, REC_POS.lng);
+  requestAnimationFrame(() => COLLECTION_MAP.invalidateSize());
+}
 function setRecPos(lat, lng){
   REC_POS = {lat: +(+lat).toFixed(5), lng: +(+lng).toFixed(5)};
   $('r-coordtext').textContent =
     `${REC_POS.lat.toFixed(5)}, ${REC_POS.lng.toFixed(5)}`.replace(/-/g, '−');
+  if (COLLECTION_MAP){
+    const point = [REC_POS.lat, REC_POS.lng];
+    if (COLLECTION_PIN) COLLECTION_PIN.setLatLng(point);
+    else {
+      COLLECTION_PIN = L.marker(point, {draggable:true}).addTo(COLLECTION_MAP);
+      COLLECTION_PIN.on('dragend', () => {
+        const p = COLLECTION_PIN.getLatLng(); setRecPos(p.lat, p.lng);
+      });
+    }
+    COLLECTION_MAP.panTo(point);
+  }
 }
 
 $('r-save').onclick = async () => {
@@ -1696,11 +1737,15 @@ $('r-save').onclick = async () => {
 };
 
 $('r-here').onclick = () => {
-  $('r-here').textContent = 'Locating…';
+  if (!navigator.geolocation) { $('r-map-hint').textContent = 'GPS unavailable. Tap the map to select a location.'; return; }
+  $('r-here').disabled = true;
+  $('r-map-hint').textContent = 'Finding your location…';
   navigator.geolocation.getCurrentPosition(
     p => { setRecPos(p.coords.latitude, p.coords.longitude);
-           $('r-here').textContent = 'Use my GPS'; },
-    () => { $('r-here').textContent = 'GPS unavailable'; },
+           COLLECTION_MAP?.setView([p.coords.latitude, p.coords.longitude], 16);
+           $('r-here').disabled = false;
+           $('r-map-hint').textContent = 'GPS location selected. Drag the pin to adjust.'; },
+    () => { $('r-here').disabled = false; $('r-map-hint').textContent = 'GPS unavailable. Tap the map to select a location.'; },
     {enableHighAccuracy:true, timeout:15000});
 };
 $('r-frommap').onclick = () => setRecPos(POS.lat, POS.lng);

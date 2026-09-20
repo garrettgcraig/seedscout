@@ -1,6 +1,7 @@
 import CoreLocation
 import SwiftUI
 import PhotosUI
+import MapKit
 
 /// Start a lot. Reached either from the plus button or, far more usefully, from
 /// a species page while you are standing at the plant - in which case almost
@@ -29,6 +30,9 @@ struct AddLotSheet: View {
     @State private var saveMessage: String?
     @State private var savedLot: SeedLot?
     @State private var didPrefill = false
+    @State private var camera: MapCameraPosition = .region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 39, longitude: -98),
+        span: MKCoordinateSpan(latitudeDelta: 40, longitudeDelta: 60)))
 
     private let lookup = try? SpeciesStore()
 
@@ -54,24 +58,14 @@ struct AddLotSheet: View {
                 Section("Collection") {
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                     TextField("Quantity (e.g. one paper bag)", text: $quantity)
+                    collectionMap
                     if let c = coordinate {
                         LabeledContent("Where",
                                        value: String(format: "%.4f, %.4f", c.latitude, c.longitude))
                     }
                     Text(locationMessage).font(.caption).foregroundStyle(.secondary)
-                    Button("Use my GPS", systemImage: "location") {
-                        Task {
-                            do {
-                                coordinate = try await location.current(precise: true)
-                                elevation = nil
-                                locationMessage = "Current GPS location"
-                            } catch {
-                                locationMessage = "Location unavailable. You can save now and add it later."
-                            }
-                        }
-                    }.disabled(location.state == .locating)
                     if let c = prefill?.coordinate {
-                        Button("Use search map pin") { coordinate = c; locationMessage = "Search map pin" }
+                        Button("Use search map pin") { selectLocation(c, message: "Search map pin") }
                     }
                     if let e = elevation { LabeledContent("Elevation", value: "\(e) m") }
                     TextField("Notes", text: $notes, axis: .vertical).lineLimit(1...5)
@@ -129,8 +123,58 @@ struct AddLotSheet: View {
         species = p.species
         common = p.common
         taxonID = p.taxonID
+        if let c = p.coordinate { centreMap(c) }
         // A search centre is not necessarily the plant's collection location.
         if let d = ISO.date(p.date) { date = d }
+    }
+
+    private var collectionMap: some View {
+        MapReader { proxy in
+            Map(position: $camera, interactionModes: [.pan, .zoom]) {
+                if let coordinate { Marker("Collection location", coordinate: coordinate) }
+            }
+            .onTapGesture { point in
+                if let c = proxy.convert(point, from: .local) {
+                    coordinate = c
+                    elevation = nil
+                    locationMessage = "Collection pin selected. Tap to move it."
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    Task {
+                        locationMessage = "Finding your location…"
+                        do {
+                            let c = try await location.current(precise: true)
+                            selectLocation(c, message: "Current GPS location")
+                        } catch {
+                            locationMessage = "GPS unavailable. Tap the map to select a location."
+                        }
+                    }
+                } label: {
+                    Image(systemName: "scope").frame(width: 44, height: 44)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Find my collection location")
+                .disabled(location.state == .locating)
+                .padding(8)
+            }
+        }
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func centreMap(_ c: CLLocationCoordinate2D) {
+        camera = .region(MKCoordinateRegion(center: c,
+            latitudinalMeters: 3000, longitudinalMeters: 3000))
+    }
+
+    private func selectLocation(_ c: CLLocationCoordinate2D, message: String) {
+        coordinate = c
+        elevation = nil
+        locationMessage = message
+        centreMap(c)
     }
 
     private func suggest() async {
