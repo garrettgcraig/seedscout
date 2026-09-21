@@ -396,7 +396,7 @@
         <div class="row">
           <div><label for="family-filter">Family</label><select id="family-filter"><option value="">All families</option></select></div>
           <div><label for="sort-order">Sort within each season</label><select id="sort-order">
-            <option value="recommended">Recommended</option><option value="distance">Nearest occurrence area</option>
+            <option value="recommended">Recommended</option>
             <option value="confidence">Highest confidence</option><option value="ending">Window ending soon</option>
           </select></div>
         </div>
@@ -923,10 +923,9 @@ function card(t, local, c, today){
     FAVORITES = next; run();
   };
   el.prepend(favorite);
-  const distance = occurrenceDistance(t);
   const browseInfo = document.createElement('div');
   browseInfo.className = 'meta';
-  browseInfo.textContent = `${Number.isFinite(distance) ? '~' + distance.toFixed(1) + ' km to occurrence area · ' : ''}Confidence ${Math.round(t.confidence*100)}% · Window ends ${fmt(t.ripe_end_doy)}`;
+  browseInfo.textContent = `Confidence ${Math.round(t.confidence*100)}% · Window ends ${fmt(t.ripe_end_doy)}`;
   el.append(browseInfo);
   detail.className = 'detail hidden';
   detail.innerHTML = detailHTML(t);
@@ -1078,20 +1077,9 @@ function browseMatches(t){
   return (!$('family-filter').value || t.family === $('family-filter').value) &&
     (!$('favorites-only').checked || FAVORITES.has(t.taxon_id));
 }
-let DISTANCES = new Map();
-function occurrenceDistance(t){
-  if (DISTANCES.has(t.taxon_id)) return DISTANCES.get(t.taxon_id);
-  const distance = Math.min(...Object.keys(t.cells || {}).map(key=>{
-    const [r,c] = key.split(',').map(Number);
-    return haversine(POS.lat, POS.lng, (r+.5)*CELL, (c+.5)*CELL);
-  }));
-  DISTANCES.set(t.taxon_id, distance);
-  return distance;
-}
 function browseCompare(a,b,today){
   let order = 0;
   switch ($('sort-order').value){
-    case 'distance': order = occurrenceDistance(a.t)-occurrenceDistance(b.t); break;
     case 'confidence': order = b.t.confidence-a.t.confidence; break;
     case 'ending': order = ahead(today,a.t.ripe_end_doy)-ahead(today,b.t.ripe_end_doy); break;
     default: order = (b.score || 0)-(a.score || 0);
@@ -1145,7 +1133,6 @@ function renderSearch(query, totals, today){
 
 function run(){
   if (!TILE_INDEX) return;
-  DISTANCES.clear();
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';

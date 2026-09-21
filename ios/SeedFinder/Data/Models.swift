@@ -31,7 +31,6 @@ struct Fit: Identifiable, Hashable {
 
     /// Fruiting records in the cells inside the current search radius.
     var localRecords: Int = 0
-    var nearestAreaKm: Double?
 
     var id: Int { taxonID }
     var displayName: String { common?.capitalizedFirst ?? name }

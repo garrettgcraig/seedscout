@@ -7,9 +7,8 @@ Live at **[garrettgcraig.com/seedfinder](https://garrettgcraig.com/seedfinder/)*
 ## Browsing
 
 Star species to save favorites on the device, filter by botanical family or
-favorites, and sort within each seasonal group by recommendation, distance,
-model confidence, or collection-window end. Distance is approximate distance to
-the nearest recorded occurrence cell, not to an individual plant. Family and
+favorites, and sort within each seasonal group by recommendation,
+model confidence, or collection-window end. Family and
 favorites filters combine with the current search and browsing settings.
 On phones, location, date, map, and additional filters expand on demand.
 

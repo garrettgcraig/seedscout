@@ -69,22 +69,7 @@ actor SpeciesStore {
             return (fit, row.int(24), row.int(25))
         }
 
-        let cells = try await db.query(
-            "SELECT taxon_id, cell_r, cell_c FROM cell WHERE cell_r BETWEEN ? AND ? AND cell_c BETWEEN ? AND ?",
-            [.int(r0-span), .int(r0+span), .int(c0-span), .int(c0+span)]
-        ) { ($0.int(0), $0.int(1), $0.int(2)) }
-        let origin = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        var distances: [Int: Double] = [:]
-        for (id, r, c) in cells {
-            let km = origin.distance(from: CLLocation(latitude: (Double(r)+0.5)*cell,
-                longitude: (Double(c)+0.5)*cell)) / 1000
-            distances[id] = min(distances[id] ?? .infinity, km)
-        }
-        return Self.resolve(rows, at: coordinate).map { fit in
-            var result = fit
-            result.nearestAreaKm = distances[fit.taxonID]
-            return result
-        }
+        return Self.resolve(rows, at: coordinate)
     }
 
     /// A species can be fitted in more than one tile inside the radius. Prefer the

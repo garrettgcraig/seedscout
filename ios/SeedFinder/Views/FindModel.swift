@@ -27,7 +27,6 @@ final class FindModel {
     var favorites: Set<Int> = Set(UserDefaults.standard.array(forKey: "seedfinder.favorites") as? [Int] ?? [])
     enum BrowseSort: String, CaseIterable, Identifiable {
         case recommended = "Recommended"
-        case distance = "Nearest occurrence area"
         case confidence = "Highest confidence"
         case ending = "Window ending soon"
         var id: String { rawValue }
@@ -123,7 +122,6 @@ final class FindModel {
                 let left: Double, right: Double
                 switch sort {
                 case .recommended: left = -a.1; right = -b.1
-                case .distance: left = a.0.nearestAreaKm ?? .infinity; right = b.0.nearestAreaKm ?? .infinity
                 case .confidence: left = -a.0.confidence; right = -b.0.confidence
                 case .ending:
                     left = Double(DOY.forward(from: day, to: a.0.ripeEnd))

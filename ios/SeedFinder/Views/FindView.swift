@@ -44,10 +44,6 @@ struct FindView: View {
                                     NavigationLink(value: fit) {
                                         VStack(alignment: .leading) {
                                             SpeciesRow(fit: fit, day: model.dayOfYear)
-                                            if let km = fit.nearestAreaKm {
-                                                Text(String(format: "~%.1f km to occurrence area", km))
-                                                    .font(.caption).foregroundStyle(.secondary)
-                                            }
                                             Text("Confidence \(Int(fit.confidence*100))% · Window ends \(DOY.label(fit.ripeEnd))")
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
