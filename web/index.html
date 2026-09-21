@@ -341,6 +341,14 @@
     font-size:.76rem;border-top:1px solid var(--line)}
   a{color:var(--accent)}
   .hidden{display:none}
+  .card{position:relative}
+  .card .head{padding-right:46px}
+  .favorite{position:absolute;right:8px;top:8px;width:40px;height:44px;padding:.25rem}
+  #browse-options{display:grid;gap:.5rem}
+  #search-settings > summary{cursor:pointer;padding:.6rem 0;font-weight:600}
+  #search-settings[open]{display:grid;gap:.6rem}
+  @media(min-width:1000px){#search-settings > summary{display:none}}
+  @media(max-width:999px){.rail > .legend .keys{display:none}.controls{margin-bottom:.6rem}}
   dialog{width:min(560px,calc(100vw - 2rem));max-height:90vh;overflow:auto;
     color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem}
   dialog::backdrop{background:rgba(0,0,0,.6)}
@@ -384,6 +392,17 @@
         <input id="search" type="search" autocomplete="off" list="taxalist"
                placeholder="Toyon, Salvia, Quercus agrifolia…">
       </div>
+      <div id="browse-options">
+        <div class="row">
+          <div><label for="family-filter">Family</label><select id="family-filter"><option value="">All families</option></select></div>
+          <div><label for="sort-order">Sort within each season</label><select id="sort-order">
+            <option value="recommended">Recommended</option><option value="distance">Nearest occurrence area</option>
+            <option value="confidence">Highest confidence</option><option value="ending">Window ending soon</option>
+          </select></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="favorites-only">Favorites only</label>
+      </div>
+      <details id="search-settings" open><summary>Location, date &amp; more filters</summary>
       <div class="row">
         <div><label for="date">Date</label><input type="date" id="date"></div>
         <div><label for="radius">Within</label>
@@ -422,6 +441,7 @@
       <label class="chk"><input type="checkbox" id="elevfilter" checked>
         Only species that grow at this elevation</label>
       <button id="go">Show ready seed</button>
+      </details>
     </div>
 
 
@@ -692,6 +712,12 @@ async function ensureTiles(lat, lng, km){
     }
   }
   assignFamilyHues(TAXA);
+  const selectedFamily = $('family-filter').value;
+  const families = [...new Set(TAXA.map(t=>t.family).filter(Boolean))].sort();
+  if (selectedFamily && !families.includes(selectedFamily)) families.push(selectedFamily);
+  $('family-filter').innerHTML = '<option value="">All families</option>' +
+    families.sort().map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  $('family-filter').value = selectedFamily;
   $('taxalist').innerHTML = TAXA
     .map(t => `<option value="${esc(t.name)}">${esc(t.common || '')}</option>`).join('');
   $('sub').innerHTML = `${TAXA.length} species near this point · ${want.length} tile${
@@ -884,6 +910,24 @@ function card(t, local, c, today){
       `<span class="tag ${k}"${style ? ` style="${style}"` : ''}>${esc(v)}</span>`).join('')}</div>`;
 
   const detail = document.createElement('div');
+  const favorite = document.createElement('button');
+  favorite.className = 'favorite ghost';
+  favorite.textContent = FAVORITES.has(t.taxon_id) ? '★' : '☆';
+  favorite.setAttribute('aria-label', 'Favorite ' + (t.common || t.name));
+  favorite.setAttribute('aria-pressed', String(FAVORITES.has(t.taxon_id)));
+  favorite.onclick = () => {
+    const next = new Set(FAVORITES);
+    if (next.has(t.taxon_id)) next.delete(t.taxon_id); else next.add(t.taxon_id);
+    try { localStorage.setItem('seedfinder.favorites', JSON.stringify([...next])); }
+    catch { alert('Could not save favorites on this device.'); return; }
+    FAVORITES = next; run();
+  };
+  el.prepend(favorite);
+  const distance = occurrenceDistance(t);
+  const browseInfo = document.createElement('div');
+  browseInfo.className = 'meta';
+  browseInfo.textContent = `${Number.isFinite(distance) ? '~' + distance.toFixed(1) + ' km to occurrence area · ' : ''}Confidence ${Math.round(t.confidence*100)}% · Window ends ${fmt(t.ripe_end_doy)}`;
+  el.append(browseInfo);
   detail.className = 'detail hidden';
   detail.innerHTML = detailHTML(t);
   el.append(detail);
@@ -1028,9 +1072,43 @@ function detailHTML(t){
     <button class="logbtn">Log a collection of this species</button>`;
 }
 
+let FAVORITES = new Set();
+try { FAVORITES = new Set(JSON.parse(localStorage.getItem('seedfinder.favorites') || '[]')); } catch {}
+function browseMatches(t){
+  return (!$('family-filter').value || t.family === $('family-filter').value) &&
+    (!$('favorites-only').checked || FAVORITES.has(t.taxon_id));
+}
+let DISTANCES = new Map();
+function occurrenceDistance(t){
+  if (DISTANCES.has(t.taxon_id)) return DISTANCES.get(t.taxon_id);
+  const distance = Math.min(...Object.keys(t.cells || {}).map(key=>{
+    const [r,c] = key.split(',').map(Number);
+    return haversine(POS.lat, POS.lng, (r+.5)*CELL, (c+.5)*CELL);
+  }));
+  DISTANCES.set(t.taxon_id, distance);
+  return distance;
+}
+function browseCompare(a,b,today){
+  let order = 0;
+  switch ($('sort-order').value){
+    case 'distance': order = occurrenceDistance(a.t)-occurrenceDistance(b.t); break;
+    case 'confidence': order = b.t.confidence-a.t.confidence; break;
+    case 'ending': order = ahead(today,a.t.ripe_end_doy)-ahead(today,b.t.ripe_end_doy); break;
+    default: order = (b.score || 0)-(a.score || 0);
+  }
+  return (Number.isNaN(order) ? 0 : order) || a.t.name.localeCompare(b.t.name);
+}
+for (const id of ['family-filter','sort-order','favorites-only']) $(id).onchange = run;
+const desktopSettings = matchMedia('(min-width:1000px)');
+function sizeSettings(){ $('search-settings').open = desktopSettings.matches; }
+sizeSettings();
+desktopSettings.addEventListener('change', sizeSettings);
+$('search-settings').addEventListener('toggle',()=>{ if ($('search-settings').open) MAP?.invalidateSize(); });
+
 function renderSearch(query, totals, today){
   const localOf = new Map([...totals].map(([t, n]) => [t.taxon_id, n]));
   const hit = t => {
+    if (!browseMatches(t)) return null;
     const sci = t.name.toLowerCase(), com = (t.common || '').toLowerCase();
     if (!sci.includes(query) && !com.includes(query)) return null;
     // Rank exact and prefix matches above mid-word ones, then by how well the
@@ -1041,7 +1119,8 @@ function renderSearch(query, totals, today){
     return {t, rank};
   };
   const matches = TAXA.map(hit).filter(Boolean)
-    .sort((a, b) => a.rank - b.rank || b.t.n_fruit - a.t.n_fruit)
+    .sort((a, b) => $('sort-order').value === 'recommended'
+      ? a.rank - b.rank || b.t.n_fruit - a.t.n_fruit : browseCompare(a,b,today))
     .slice(0, 30);
 
   const out = $('out');
@@ -1066,6 +1145,7 @@ function renderSearch(query, totals, today){
 
 function run(){
   if (!TILE_INDEX) return;
+  DISTANCES.clear();
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';
@@ -1081,6 +1161,7 @@ function run(){
   const buckets = {now:[], soon:[], past:[]};
 
   for (const [t, local] of totals){
+    if (!browseMatches(t)) continue;
     if (nativesOnly && t.establishment === 'introduced') continue;
     // Elevation is used for presence, not timing: a montane species inside the
     // radius is still not growing at the coast. Margin is generous because the
@@ -1105,7 +1186,7 @@ function run(){
   const titles = {now:'Collectible now', soon:'Coming up (next 6 weeks)', past:'Just missed'};
   let any = false;
   for (const k of ['now','soon','past']){
-    const list = buckets[k].sort((a,b) => b.score - a.score);
+    const list = buckets[k].sort((a,b) => browseCompare(a,b,today));
     if (!list.length) continue;
     any = true;
     const h = document.createElement('div');
@@ -1114,8 +1195,7 @@ function run(){
     out.append(h);
     for (const r of list.slice(0, 40)) out.append(card(r.t, r.local, r.c, today));
   }
-  if (!any) out.innerHTML = '<div class="empty">No modelled species match. Try a larger radius, ' +
-    'or switch off the elevation filter. The pilot dataset covers Santa Barbara and Ventura counties.</div>';
+  if (!any) out.innerHTML = '<div class="empty">No species match these filters and dates. Try all families, turn off Favorites only, or change the date or radius.</div>';
 }
 
 /* ---------- collection records ---------- */
@@ -1932,10 +2012,7 @@ document.addEventListener('click', e => {
    than one that gives up the header's worth of space. Only the controls inside
    it scroll; the ethics note and legend keep their place. */
 function fitRail(){
-  // Collapse the legend's prose where the rail is height-constrained; on a
-  // phone the page just scrolls and there is no reason to hide it.
-  const more = document.querySelector('.legendmore');
-  if (more) more.open = !matchMedia('(min-width: 1000px)').matches;
+  // Leave the legend collapsed until the reader opens it, including on phones.
 
   const rail = document.querySelector('.rail');
   if (!rail) return;

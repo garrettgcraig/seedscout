@@ -20,6 +20,22 @@ final class FindModel {
     var matchElevation = true
     var elevation: Int?
     var query = ""
+    var family = ""
+    var favoritesOnly = false
+    var sort = BrowseSort.recommended
+    var families: [String] = []
+    var favorites: Set<Int> = Set(UserDefaults.standard.array(forKey: "seedfinder.favorites") as? [Int] ?? [])
+    enum BrowseSort: String, CaseIterable, Identifiable {
+        case recommended = "Recommended"
+        case distance = "Nearest occurrence area"
+        case confidence = "Highest confidence"
+        case ending = "Window ending soon"
+        var id: String { rawValue }
+    }
+    func toggleFavorite(_ id: Int) {
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        UserDefaults.standard.set(Array(favorites), forKey: "seedfinder.favorites")
+    }
 
     private(set) var buckets: [Bucket: [Fit]] = [:]
     /// Why a search came back empty, so the UI can say something true.
@@ -53,13 +69,16 @@ final class FindModel {
             // are the ones the user is waiting for.
             guard mine == generation else { return }
             speciesCount = fits.count
-            buckets = Self.group(fits, day: dayOfYear, nativesOnly: nativesOnly,
+            families = Array(Set(fits.compactMap(\.family) + (family.isEmpty ? [] : [family]))).sorted()
+            let filtered = fits.filter { (family.isEmpty || $0.family == family) &&
+                (!favoritesOnly || favorites.contains($0.taxonID)) }
+            buckets = Self.group(filtered, day: dayOfYear, nativesOnly: nativesOnly,
                                  elevation: matchElevation ? elevation : nil,
-                                 query: query)
+                                 query: query, sort: sort)
             loadError = nil
             outcome = buckets.values.contains(where: { !$0.isEmpty })
                 ? .found
-                : await diagnose(fits: fits)
+                : (!family.isEmpty || favoritesOnly ? .found : await diagnose(fits: fits))
         } catch {
             guard mine == generation else { return }
             loadError = error.localizedDescription
@@ -67,7 +86,8 @@ final class FindModel {
     }
 
     static func group(
-        _ fits: [Fit], day: Int, nativesOnly: Bool, elevation: Int?, query: String
+        _ fits: [Fit], day: Int, nativesOnly: Bool, elevation: Int?, query: String,
+        sort: BrowseSort = .recommended
     ) -> [Bucket: [Fit]] {
         let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
         var out: [Bucket: [(Fit, Double)]] = [:]
@@ -99,7 +119,18 @@ final class FindModel {
         }
 
         return out.mapValues { pairs in
-            pairs.sorted { $0.1 > $1.1 }.prefix(60).map(\.0)
+            pairs.sorted { a, b in
+                let left: Double, right: Double
+                switch sort {
+                case .recommended: left = -a.1; right = -b.1
+                case .distance: left = a.0.nearestAreaKm ?? .infinity; right = b.0.nearestAreaKm ?? .infinity
+                case .confidence: left = -a.0.confidence; right = -b.0.confidence
+                case .ending:
+                    left = Double(DOY.forward(from: day, to: a.0.ripeEnd))
+                    right = Double(DOY.forward(from: day, to: b.0.ripeEnd))
+                }
+                return left == right ? a.0.name < b.0.name : left < right
+            }.prefix(60).map(\.0)
         }
     }
 

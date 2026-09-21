@@ -14,17 +14,54 @@ struct FindView: View {
     )
     /// Debounces the map: dragging fires continuously and each move is a query.
     @State private var pendingMove: Task<Void, Never>?
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var settingsExpanded = false
 
     var body: some View {
         NavigationStack {
             List {
-                Section { controls } header: { Text("Where and when") }
+                Section {
+                    if sizeClass == .regular { controls }
+                    else {
+                        DisclosureGroup("Location & date · \(Int(model.radiusKm)) km",
+                                        isExpanded: $settingsExpanded) { controls }
+                    }
+                    Picker("Family", selection: $model.family) {
+                        Text("All families").tag("")
+                        ForEach(model.families, id: \.self) { Text($0).tag($0) }
+                    }.onChange(of: model.family) { scheduleRefresh(delay: .zero) }
+                    Picker("Sort within each season", selection: $model.sort) {
+                        ForEach(FindModel.BrowseSort.allCases) { Text($0.rawValue).tag($0) }
+                    }.onChange(of: model.sort) { scheduleRefresh(delay: .zero) }
+                    Toggle("Favorites only", isOn: $model.favoritesOnly)
+                        .onChange(of: model.favoritesOnly) { scheduleRefresh(delay: .zero) }
+                } header: { Text("Browse") }
                 ForEach(FindModel.Bucket.allCases) { bucket in
                     if let rows = model.buckets[bucket], !rows.isEmpty {
                         Section {
                             ForEach(rows) { fit in
-                                NavigationLink(value: fit) {
-                                    SpeciesRow(fit: fit, day: model.dayOfYear)
+                                HStack {
+                                    NavigationLink(value: fit) {
+                                        VStack(alignment: .leading) {
+                                            SpeciesRow(fit: fit, day: model.dayOfYear)
+                                            if let km = fit.nearestAreaKm {
+                                                Text(String(format: "~%.1f km to occurrence area", km))
+                                                    .font(.caption).foregroundStyle(.secondary)
+                                            }
+                                            Text("Confidence \(Int(fit.confidence*100))% · Window ends \(DOY.label(fit.ripeEnd))")
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Button {
+                                        model.toggleFavorite(fit.taxonID)
+                                        scheduleRefresh(delay: .zero)
+                                    } label: {
+                                        Image(systemName: model.favorites.contains(fit.taxonID) ? "star.fill" : "star")
+                                            .frame(width: 44, height: 44)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Favorite \(fit.displayName)")
+                                    .accessibilityValue(model.favorites.contains(fit.taxonID) ? "Selected" : "Not selected")
                                 }
                             }
                         } header: {
@@ -201,8 +238,7 @@ struct FindView: View {
             ContentUnavailableView(
                 "Nothing ready here",
                 systemImage: "leaf",
-                description: Text("No species are in their collection window at this date and place. "
-                                  + "Try another date, or a wider radius."))
+                description: Text("No species match these filters and dates. Try all families, turn off Favorites only, or change the date or radius."))
         default:
             VStack(spacing: 12) {
                 Image(systemName: iconName)
