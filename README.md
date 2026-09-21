@@ -12,6 +12,12 @@ model confidence, or collection-window end. Family and
 favorites filters combine with the current search and browsing settings.
 On phones, location, date, map, and additional filters expand on demand.
 
+Species maps load nearby research-grade iNaturalist observations from all dates,
+without requiring flower or fruit annotations. These location records are separate
+from the phenology model. Maps require internet access, load 100 observations at a
+time, and offer a Load more button with progress counts. Public coordinates may be
+approximate; a sighting does not establish current seed readiness or plant survival.
+
 ## Collection and propagation records
 
 Log a collection from a species page with the species and today's date filled in.
