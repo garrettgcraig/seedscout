@@ -345,6 +345,11 @@
   .card .head{padding-right:46px}
   .favorite{position:absolute;right:8px;top:8px;width:40px;height:44px;padding:.25rem}
   #browse-options{display:grid;gap:.5rem}
+  .browse-shortcuts{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+  #filter-toggle{width:auto;padding:.45rem .75rem}
+  #filter-options[hidden]{display:none}
+  #settings-summary{overflow-wrap:anywhere}
+  @media(min-width:1000px){#filter-toggle{display:none}}
   #search-settings > summary{cursor:pointer;padding:.6rem 0;font-weight:600}
   #search-settings[open]{display:grid;gap:.6rem}
   @media(min-width:1000px){#search-settings > summary{display:none}}
@@ -393,16 +398,19 @@
                placeholder="Toyon, Salvia, Quercus agrifolia…">
       </div>
       <div id="browse-options">
-        <div class="row">
+        <div class="browse-shortcuts">
+          <label class="chk"><input type="checkbox" id="favorites-only">Favorites only</label>
+          <button type="button" id="filter-toggle" aria-expanded="false" aria-controls="filter-options">Filters</button>
+        </div>
+        <div class="row" id="filter-options" hidden>
           <div><label for="family-filter">Family</label><select id="family-filter"><option value="">All families</option></select></div>
           <div><label for="sort-order">Sort within each season</label><select id="sort-order">
             <option value="recommended">Recommended</option>
             <option value="confidence">Highest confidence</option><option value="ending">Window ending soon</option>
           </select></div>
         </div>
-        <label class="chk"><input type="checkbox" id="favorites-only">Favorites only</label>
       </div>
-      <details id="search-settings" open><summary>Location, date &amp; more filters</summary>
+      <details id="search-settings"><summary id="settings-summary">Santa Barbara · Location &amp; date</summary>
       <div class="row">
         <div><label for="date">Date</label><input type="date" id="date"></div>
         <div><label for="radius">Within</label>
@@ -768,6 +776,7 @@ function initMap(){
   }).addTo(MAP);
 
   const moved = latlng => {
+    selectedPlaceLabel = 'Map pin';
     POS = {lat: +latlng.lat.toFixed(5), lng: +latlng.lng.toFixed(5)};
     PIN.setLatLng(latlng); RING.setLatLng(latlng);
     refreshPosition();
@@ -802,7 +811,8 @@ function fitRing(){
   MAP.fitBounds(RING.getBounds(), {padding: [12, 12]});
 }
 
-function setPosition(lat, lng, zoom){
+function setPosition(lat, lng, zoom, label = 'Map pin'){
+  selectedPlaceLabel = label;
   POS = {lat: +(+lat).toFixed(5), lng: +(+lng).toFixed(5)};
   if (MAP){
     PIN.setLatLng([POS.lat, POS.lng]);
@@ -1067,7 +1077,24 @@ function browseCompare(a,b,today){
 }
 for (const id of ['family-filter','sort-order','favorites-only']) $(id).onchange = run;
 const desktopSettings = matchMedia('(min-width:1000px)');
-function sizeSettings(){ $('search-settings').open = desktopSettings.matches; }
+function sizeSettings(){
+  $('search-settings').open = desktopSettings.matches;
+  $('filter-options').hidden = !desktopSettings.matches;
+  $('filter-toggle').setAttribute('aria-expanded', String(desktopSettings.matches));
+}
+$('filter-toggle').onclick = () => {
+  const expanded = $('filter-options').hidden;
+  $('filter-options').hidden = !expanded;
+  $('filter-toggle').setAttribute('aria-expanded', String(expanded));
+};
+let selectedPlaceLabel = 'Santa Barbara';
+function updateSettingsSummary(){
+  const date = $('date').value;
+  const label = date ? new Date(date + 'T12:00').toLocaleDateString(undefined, {month:'short',day:'numeric'}) : 'Choose date';
+  $('settings-summary').textContent = `${selectedPlaceLabel} · ${label} · ${$('radius').value} km`;
+  const active = Number(!!$('family-filter').value) + Number($('sort-order').value !== 'recommended');
+  $('filter-toggle').textContent = active ? `Filters (${active})` : 'Filters';
+}
 sizeSettings();
 desktopSettings.addEventListener('change', sizeSettings);
 $('search-settings').addEventListener('toggle',()=>{ if ($('search-settings').open) MAP?.invalidateSize(); });
@@ -1111,6 +1138,7 @@ function renderSearch(query, totals, today){
 }
 
 function run(){
+  updateSettingsSummary();
   if (!TILE_INDEX) return;
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
@@ -1873,7 +1901,10 @@ function showTab(which){
 $('tab-find').onclick = () => showTab('find');
 $('tab-log').onclick = () => { showTab('log'); renderLog(); };
 
-$('go').onclick = run;
+$('go').onclick = () => {
+  run();
+  if (!desktopSettings.matches) $('search-settings').open = false;
+};
 for (const id of ['date','kind','elevfilter']) $(id).onchange = run;
 // Search as you type, lightly debounced so a 1,000-species scan does not run on
 // every keystroke.
@@ -1895,7 +1926,7 @@ function locateMe(btn){
   navigator.geolocation.getCurrentPosition(
     p => {
       btn.classList.remove('busy');
-      setPosition(p.coords.latitude, p.coords.longitude, 12);
+      setPosition(p.coords.latitude, p.coords.longitude, 12, 'Current location');
       fitRing();
     },
     err => {
@@ -1932,7 +1963,7 @@ function showPlaces(items){
     b.onclick = () => {
       $('place').value = head;
       hidePlaces();
-      setPosition(+it.lat, +it.lon, 11);
+      setPosition(+it.lat, +it.lon, 11, head);
       fitRing();
     };
     box.append(b);

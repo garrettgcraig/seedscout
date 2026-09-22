@@ -16,6 +16,12 @@ struct FindView: View {
     @State private var pendingMove: Task<Void, Never>?
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var settingsExpanded = false
+    @State private var filtersExpanded = false
+    @State private var selectedPlaceLabel = "Santa Barbara"
+
+    private var settingsSummary: String {
+        "\(selectedPlaceLabel) · \(model.date.formatted(.dateTime.month(.abbreviated).day())) · \(Int(model.radiusKm)) km"
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,9 +29,24 @@ struct FindView: View {
                 Section {
                     if sizeClass == .regular { controls }
                     else {
-                        DisclosureGroup("Location & date · \(Int(model.radiusKm)) km",
+                        DisclosureGroup(settingsSummary,
                                         isExpanded: $settingsExpanded) { controls }
                     }
+                    HStack {
+                        Toggle("Favorites only", isOn: $model.favoritesOnly)
+                            .onChange(of: model.favoritesOnly) { scheduleRefresh(delay: .zero) }
+                        if sizeClass != .regular {
+                            Button {
+                                withAnimation { filtersExpanded.toggle() }
+                            } label: {
+                                Label(model.family.isEmpty && model.sort == .recommended ? "Filters" : "Filters •",
+                                      systemImage: "line.3.horizontal.decrease")
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityValue(filtersExpanded ? "Expanded" : "Collapsed")
+                        }
+                    }
+                    if sizeClass == .regular || filtersExpanded {
                     Picker("Family", selection: $model.family) {
                         Text("All families").tag("")
                         ForEach(model.families, id: \.self) { Text($0).tag($0) }
@@ -33,8 +54,7 @@ struct FindView: View {
                     Picker("Sort within each season", selection: $model.sort) {
                         ForEach(FindModel.BrowseSort.allCases) { Text($0.rawValue).tag($0) }
                     }.onChange(of: model.sort) { scheduleRefresh(delay: .zero) }
-                    Toggle("Favorites only", isOn: $model.favoritesOnly)
-                        .onChange(of: model.favoritesOnly) { scheduleRefresh(delay: .zero) }
+                    }
                 } header: { Text("Browse") }
                 ForEach(FindModel.Bucket.allCases) { bucket in
                     if let rows = model.buckets[bucket], !rows.isEmpty {
@@ -85,7 +105,7 @@ struct FindView: View {
                 SpeciesDetailView(fit: $0, day: model.dayOfYear,
                                   centre: model.coordinate, radiusKm: model.radiusKm)
             }
-            .searchable(text: $model.query, prompt: "Find a specific plant")
+            .searchable(text: $model.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find a specific plant")
             .onChange(of: model.query) { scheduleRefresh(delay: .milliseconds(180)) }
             .task { await model.refresh() }
         }
@@ -109,6 +129,13 @@ struct FindView: View {
             .onChange(of: model.nativesOnly) { scheduleRefresh(delay: .zero) }
         Toggle("Only species at this elevation", isOn: $model.matchElevation)
             .onChange(of: model.matchElevation) { scheduleRefresh(delay: .zero) }
+        if sizeClass != .regular {
+            Button("Show ready seed") {
+                scheduleRefresh(delay: .zero)
+                withAnimation { settingsExpanded = false }
+            }
+            .buttonStyle(.borderedProminent)
+        }
     }
 
     @ViewBuilder private var placeField: some View {
@@ -146,7 +173,7 @@ struct FindView: View {
     private func go(to result: PlaceSearch.Result) {
         placeQuery = result.title
         places.clear()
-        moveTo(result.coordinate, recenter: true)
+        moveTo(result.coordinate, recenter: true, label: result.title)
     }
 
     private var map: some View {
@@ -194,7 +221,8 @@ struct FindView: View {
 
     // MARK: - Actions
 
-    private func moveTo(_ c: CLLocationCoordinate2D, recenter: Bool) {
+    private func moveTo(_ c: CLLocationCoordinate2D, recenter: Bool, label: String = "Map pin") {
+        selectedPlaceLabel = label
         model.coordinate = c
         // Keep place results biased to wherever the user is now looking.
         places.region = MKCoordinateRegion(center: c, latitudinalMeters: 200_000,
@@ -220,7 +248,7 @@ struct FindView: View {
     private func locateMe() async {
         do {
             let c = try await location.current()
-            moveTo(c, recenter: true)
+            moveTo(c, recenter: true, label: "Current location")
         } catch {
             // State is already reflected on the button; nothing further to do.
         }
