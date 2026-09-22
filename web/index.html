@@ -990,7 +990,7 @@ async function mountObsMap(detail, t){
         link.href = 'https://www.inaturalist.org/observations/' + Number(obs.id);
         link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'View observation';
         popup.append(link);
-        L.circleMarker([coords[1],coords[0]],{radius:4,color:'#3f6b2e',weight:1,fillOpacity:.65})
+        L.circleMarker([coords[1],coords[0]],{radius:6,color:'#fff',weight:2,fillColor:'#ff3b30',fillOpacity:1})
           .bindPopup(popup).addTo(map);
       }
       if (data.results.length) cursor = data.results[data.results.length-1].id;

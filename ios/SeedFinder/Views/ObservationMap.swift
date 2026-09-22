@@ -52,9 +52,14 @@ struct ObservationMap: View {
                             .frame(width: 13, height: 13)
                     }
                     ForEach(points) { p in
-                        MapCircle(center: p.coordinate, radius: 110)
-                            .foregroundStyle(Color.ripeTint.opacity(0.55))
-                            .stroke(Color.ripeTint.opacity(0.8), lineWidth: 0.5)
+                        Annotation("Observation", coordinate: p.coordinate) {
+                            Circle()
+                                .fill(Color(red: 1, green: 0.23, blue: 0.19))
+                                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+                                .frame(width: 12, height: 12)
+                                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                        }
+                        .annotationTitles(.hidden)
                     }
                 }
                 .frame(height: 260)
