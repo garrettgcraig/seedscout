@@ -62,11 +62,11 @@ struct FindView: View {
                             ForEach(rows) { fit in
                                 HStack {
                                     NavigationLink(value: fit) {
-                                        VStack(alignment: .leading) {
-                                            SpeciesRow(fit: fit, day: model.dayOfYear)
-                                            Text("Confidence \(Int(fit.confidence*100))% · Window ends \(DOY.label(fit.ripeEnd))")
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
+                                        // Confidence now lives in the row's fact line, and the
+                                        // window end is already in its header; this line
+                                        // repeated both, with confidence truncated rather
+                                        // than rounded, so the two figures disagreed.
+                                        SpeciesRow(fit: fit, day: model.dayOfYear)
                                     }
                                     Button {
                                         model.toggleFavorite(fit.taxonID)

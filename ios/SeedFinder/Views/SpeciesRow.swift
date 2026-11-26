@@ -51,9 +51,11 @@ struct SpeciesRow: View {
             parts.append(Text(f).foregroundStyle(FamilyColor.hue(for: f)).fontWeight(.semibold))
         }
         if fit.isIntroduced { parts.append(Text("non-native")) }
-        parts.append(Text("\(fit.localRecords) record\(fit.localRecords == 1 ? "" : "s") nearby"))
-        if let lo = fit.elevLo, let hi = fit.elevHi { parts.append(Text("\(lo)–\(hi) m")) }
-        parts.append(Text("\(Int((fit.confidence * 100).rounded()))% confidence"))
+        parts.append(Text("\(fit.localRecords)\u{00A0}record\(fit.localRecords == 1 ? "" : "s")\u{00A0}nearby"))
+        // Word joiner after the dash and a no-break space before the unit, so the
+        // range never splits as "41– / 577 m".
+        if let lo = fit.elevLo, let hi = fit.elevHi { parts.append(Text("\(lo)–\u{2060}\(hi)\u{00A0}m")) }
+        parts.append(Text("\(Int((fit.confidence * 100).rounded()))%\u{00A0}confidence"))
         let joined = parts.dropFirst().reduce(parts.first ?? Text("")) { $0 + Text("  ·  ").foregroundStyle(.tertiary) + $1 }
         return joined.font(.footnote).foregroundStyle(.secondary).monospacedDigit()
     }
