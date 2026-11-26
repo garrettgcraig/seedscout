@@ -122,23 +122,24 @@ private struct LotRow: View {
             Text(lot.species).font(.caption).italic().foregroundStyle(.secondary)
             Text("\(lot.batchCode) · \(lot.batchName ?? "Collection")")
                 .font(.caption).foregroundStyle(.secondary)
-            FlowRow(spacing: 5) {
-                ForEach(Array(lc.stages.enumerated()), id: \.offset) { _, stage in
-                    stageTag(stage)
-                }
+            // One line, like the web client: color marks what needs you.
+            lc.stages.enumerated().reduce(Text("")) { line, item in
+                (item.offset == 0 ? line : line + Text("  ·  ").foregroundStyle(.tertiary)) + stageText(item.element)
             }
+            .font(.footnote)
         }
         .padding(.vertical, 2)
     }
 
-    @ViewBuilder private func stageTag(_ s: Lifecycle.Stage) -> some View {
+    private func stageText(_ s: Lifecycle.Stage) -> Text {
         switch s {
-        case .collected:                 Tag("collected", .accent)
-        case .scarified(let m):          Tag("scarified: \(m)", .accent)
-        case .stratifying(let d, _):     Tag("stratifying · \(d) d left", .warn)
-        case .readyToSow(let since):     Tag(since > 0 ? "ready to sow · \(since) d ago" : "ready to sow", .alert)
-        case .sown(let d):               Tag("sown \(d)", .accent)
-        case .germinated(let rate, _):   Tag("\(Int(rate * 100))% germination", .accent)
+        case .collected:               return Text("collected").foregroundStyle(.primary)
+        case .scarified(let m):        return Text("scarified: \(m)").foregroundStyle(.primary)
+        case .stratifying(let d, _):   return Text("stratifying · \(d) d left").foregroundStyle(.orange).fontWeight(.semibold)
+        case .readyToSow(let since):   return Text(since > 0 ? "ready to sow · \(since) d ago" : "ready to sow")
+                                                .foregroundStyle(.red).fontWeight(.semibold)
+        case .sown(let d):             return Text("sown \(d)").foregroundStyle(.primary)
+        case .germinated(let rate, _): return Text("\(Int(rate * 100))% germination").foregroundStyle(.primary)
         }
     }
 }

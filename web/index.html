@@ -36,6 +36,19 @@
     }
   }
   *{box-sizing:border-box}
+  /* The browser default grey measured 3.9:1 on the dark field. */
+  ::placeholder{color:var(--muted);opacity:1}
+  /* The parts we did not draw still belong to the design. */
+  ::selection{background:color-mix(in srgb, var(--accent) 28%, transparent);color:var(--ink)}
+  :root{accent-color:var(--accent);caret-color:var(--accent);
+    scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent}
+  :where(a,button,input,select,summary,[tabindex]):focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+  @media (prefers-reduced-motion: reduce){
+    /* Keep state changes legible; remove only the travel. */
+    *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+      transition-duration:.01ms !important;scroll-behavior:auto !important}
+  }
   body{margin:0;background:var(--bg);color:var(--ink);
     font:16px/1.5 'InterVar',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
     font-feature-settings:'cv05' 1,'ss03' 1;   /* single-storey l, curved r */
@@ -57,7 +70,13 @@
   .controls{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:.9rem;display:grid;gap:.7rem;margin-bottom:1rem}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-  label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
+  /* Two selects side by side clipped "Recommended" to "Recommendec" at both
+     phone and sidebar widths. They stack; the values matter more than the row. */
+  #filter-options{grid-template-columns:1fr}
+  /* Sentence case, not an uppercase letterspaced eyebrow floating above the
+     control. The label is part of the field, so it sits close and reads as
+     prose. */
+  label{display:block;font-size:.8rem;letter-spacing:0;
     color:var(--muted);margin-bottom:.28rem;font-weight:600}
   input,select,textarea,button{font:inherit;color:inherit;background:var(--bg);
     border:1px solid var(--line);border-radius:10px;padding:.6rem .7rem;width:100%}
@@ -95,8 +114,9 @@
   .chk input{width:auto;margin:0}
 
   /* ---- map picker ---- */
-  #map{height:210px;border-radius:10px;border:1px solid var(--line);background:var(--bg);
-    z-index:0}
+  /* No border: the map sat as a card inside the controls card inside the rail.
+     It reads as a figure in the panel, held by its own silhouette. */
+  #map{height:210px;border-radius:10px;background:var(--bg);z-index:0}
   #map.dead{display:none}
   .maprow{display:grid;gap:.4rem}
   .placewrap{position:relative}
@@ -123,28 +143,33 @@
   .coords{display:flex;justify-content:space-between;align-items:baseline;gap:.6rem;
     font-size:.78rem;color:var(--muted)}
   .coords b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
-  .maphint{font-size:.72rem;color:var(--muted);font-style:italic}
+  .maphint{font-size:.8rem;color:var(--muted);font-style:italic}
   .mapfail{display:none;background:var(--warn-soft);border-left:3px solid var(--warn);
     border-radius:8px;padding:.6rem .7rem;font-size:.8rem}
   .mapfail.on{display:block}
   /* Leaflet's own controls need to sit above the card, but below nothing else. */
   .leaflet-container{font:inherit}
-  .leaflet-control-attribution{font-size:.6rem}
+  .leaflet-control-attribution{font-size:.7rem}
+  /* Leaflet's default link blue measured 3.2:1 on its own grey; take the ink. */
+  .leaflet-control-attribution a{color:#1f2a16}
+  .leaflet-container .leaflet-control-attribution{background:rgba(255,255,255,.85)}
 
   /* Collection guidance as a dismissible top bar. Dismissal is remembered, which
      is only acceptable because the same guidance is repeated in the log form at
      the point of actually recording a collection, and rare species carry their
      own inline warning. */
   .ethicsbar{background:var(--warn-soft);border-bottom:1px solid var(--warn);
-    position:sticky;top:0;z-index:700}
+    position:relative;z-index:700}
+  /* Pinned only on wide screens, where it is two lines. On a phone it wraps to
+     eight and pinning it covered nearly half the viewport. */
+  @media (min-width: 1000px){ .ethicsbar{position:sticky;top:0} }
   .ethicsbar-in{max-width:1180px;margin:0 auto;padding:.6rem 1.1rem;
     display:flex;align-items:flex-start;gap:.6rem}
-  .ethicsbar p{margin:0;font-size:.8rem;line-height:1.45;flex:1}
+  .ethicsbar p{margin:0;font-size:.82rem;line-height:1.5;flex:1;max-width:62ch}
   .ethicsbar b{color:var(--warn)}
   .ethicsbar-rare{color:var(--alert);font-weight:700}
-  .ethicsbar-icon{flex:none;width:18px;height:18px;border-radius:50%;
-    background:var(--warn);color:var(--bg);font-weight:800;font-size:.72rem;
-    display:grid;place-items:center;margin-top:.1rem}
+  .ethicsbar-icon{flex:none;width:17px;height:17px;margin-top:.15rem;color:var(--warn);
+    fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   /* width:auto is load-bearing: the global input/select/button rule sets
      width:100%, which made this close button claim the whole bar and squeeze
      the message into a one-word column. */
@@ -174,12 +199,13 @@
   /* Columns are weighted by days per month so the letters sit under the same
      gridlines the SVG draws. */
   .tlmonths{display:grid;grid-template-columns:31fr 28fr 31fr 30fr 31fr 30fr 31fr 31fr 30fr 31fr 30fr 31fr;
-    font-size:.62rem;color:var(--muted);letter-spacing:.04em;margin-top:1px}
+    font-size:.7rem;color:var(--muted);letter-spacing:.04em;margin-top:1px}
   .tlmonths span{text-align:center}
 
   .legendmore{margin-top:.45rem}
-  .legendmore summary{cursor:pointer;font-weight:600;color:var(--ink);font-size:.76rem;
-    list-style:none;display:flex;align-items:center;gap:.3rem}
+  .legendmore summary{cursor:pointer;font-weight:600;color:var(--ink);font-size:.8rem;
+    list-style:none;display:flex;align-items:center;gap:.35rem;
+    min-height:24px;margin:-2px 0}
   .legendmore summary::-webkit-details-marker{display:none}
   .legendmore summary::before{content:"▸";transition:transform .15s;display:inline-block;
     color:var(--muted)}
@@ -193,9 +219,22 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     padding:.8rem .9rem;margin-bottom:.55rem;display:grid;gap:.5rem}
   .card.sensitive{border-color:var(--alert);background:var(--alert-soft)}
+  /* A real button so the keyboard can reach it: this is the only way into a
+     species' photos, field notes and log action. */
+  .name strong::first-letter{text-transform:uppercase}
+  button.head{width:100%;text-align:left;background:none;border:0;border-radius:0;
+    padding:0;font:inherit;color:inherit;cursor:pointer}
   .head{display:grid;grid-template-columns:56px 1fr auto;gap:.65rem;align-items:start;
     cursor:pointer}
   .head.nophoto{grid-template-columns:1fr auto}
+  @media (max-width: 560px){
+    .head{grid-template-columns:52px 1fr}
+    .head.nophoto{grid-template-columns:1fr}
+    .head .when{grid-column:2;text-align:left;display:flex;gap:.5rem;align-items:baseline;
+      flex-wrap:wrap}
+    .head.nophoto .when{grid-column:1}
+    .head .when small{margin:0}
+  }
   .thumb{width:56px;height:56px;border-radius:9px;object-fit:cover;background:var(--line);
     border:1px solid var(--line)}
   .name strong{font-size:1.06rem;letter-spacing:-.005em;display:block;
@@ -204,30 +243,45 @@
   .name em{color:var(--muted);font-style:italic;font-size:.85rem;font-weight:400}
   .when{white-space:nowrap;font-size:.82rem;color:var(--accent);font-weight:700;text-align:right}
   .when.soon{color:var(--warn)} .when.past{color:var(--muted)}
-  .when small{display:block;font-weight:500;color:var(--muted);font-size:.68rem}
+  /* The ripe window is the answer to the whole page; it should not be the
+     smallest text on the card. */
+  .when small{display:block;font-weight:500;color:var(--muted);font-size:.78rem;
+    font-variant-numeric:tabular-nums;margin-top:.1rem}
 
-  .tags{display:flex;flex-wrap:wrap;gap:.3rem}
-  .tag{font-size:.68rem;padding:.16rem .45rem;border-radius:20px;background:var(--accent-soft);
-    color:var(--accent);font-weight:600;white-space:nowrap}
-  .tag.grey{background:var(--line);color:var(--muted)}
-  /* Family tags carry a per-family hue via an inline --h, so the same family
-     reads the same colour everywhere. Lightness is fixed per theme to keep
-     contrast even across the hue circle. */
-  /* The outline is not decoration: some family hues land near the accent green,
-     and it keeps them from reading as the semantic "records nearby" tag. */
-  .tag.fam{background:hsl(var(--h) 42% 90%);color:hsl(var(--h) 55% 27%);
-    border:1px solid hsl(var(--h) 38% 72%)}
-  @media (prefers-color-scheme:dark){
-    .tag.fam{background:hsl(var(--h) 26% 20%);color:hsl(var(--h) 58% 72%);
-      border-color:hsl(var(--h) 30% 38%)}
-  }
-  .tag.warn{background:var(--warn-soft);color:var(--warn)}
-  .tag.bad{background:var(--alert-soft);color:var(--alert)}
+  /* Facts read as one quiet line, so the timeline above stays the loudest
+     thing in the card. Cautions get their own line and their own color: when
+     everything was a pill at 10.9px, a rare-species warning carried the same
+     weight as a family name. */
+  .meta{margin:.45rem 0 0;font-size:.78rem;line-height:1.45;color:var(--muted);
+    font-variant-numeric:tabular-nums}
+  /* Facts never split internally ("1009 / m"), but the spaces around each
+     separator are real so the line can still break between them. Without
+     those spaces the whole line was one unbreakable run and pushed the card
+     wider than the phone. */
+  .meta .sep{opacity:.5}
+  .meta .fact{white-space:nowrap}
+  .flags > span{min-width:0}
+  .meta .fam{color:hsl(var(--h) 52% 30%);font-weight:600}
+  @media (prefers-color-scheme:dark){ .meta .fam{color:hsl(var(--h) 55% 73%)} }
+  .flags{margin:.3rem 0 0;font-size:.78rem;line-height:1.5;color:var(--warn);
+    display:flex;gap:.4rem;align-items:flex-start}
+  .flags svg{width:13px;height:13px;flex:none;margin-top:.16rem;
+    stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .flags.stop{color:var(--alert);font-weight:600}
+  .flags b{font-weight:600}
+  /* A lot's lifecycle reads as one line, like a species' facts: color marks
+     what needs you, not a row of pills. */
+  .stages{margin-top:.15rem;font-size:.8rem;line-height:1.5;color:var(--muted)}
+  .stages .sep{opacity:.5}
+  .stage{white-space:nowrap}
+  .stage.done{color:var(--ink)}
+  .stage.active{color:var(--warn);font-weight:600}
+  .stage.late{color:var(--alert);font-weight:600}
 
   .detail{border-top:1px solid var(--line);padding-top:.6rem;display:grid;gap:.55rem;
     font-size:.86rem}
   .detail dl{margin:0;display:grid;gap:.4rem}
-  .detail dt{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  .detail dt{font-size:.78rem;color:var(--muted);
     font-weight:700}
   .detail dd{margin:0}
   .shots{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
@@ -235,9 +289,9 @@
   /* Fixed aspect keeps a portrait and a landscape observation photo aligned. */
   .shots img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:9px;
     border:1px solid var(--line);display:block;background:var(--line)}
-  .shots figcaption{font-size:.62rem;line-height:1.35;color:var(--muted);margin-top:.25rem;
+  .shots figcaption{font-size:.72rem;line-height:1.35;color:var(--muted);margin-top:.25rem;
     overflow-wrap:anywhere}
-  .scope{font-size:.66rem;color:var(--muted);font-style:italic}
+  .scope{font-size:.78rem;color:var(--muted);font-style:italic}
   .caution{background:var(--alert-soft);color:var(--alert);border-radius:8px;padding:.5rem .6rem;
     font-size:.82rem}
 
@@ -248,20 +302,14 @@
   .rec .delta{font-size:.72rem;font-weight:700}
 
   /* ---- propagation ---- */
-  .stages{display:flex;flex-wrap:wrap;gap:.28rem;margin-top:.1rem}
-  .stage{font-size:.66rem;padding:.14rem .42rem;border-radius:20px;font-weight:700;
-    background:var(--line);color:var(--muted)}
-  .stage.done{background:var(--accent-soft);color:var(--accent)}
-  .stage.active{background:var(--warn-soft);color:var(--warn)}
-  .stage.late{background:var(--alert-soft);color:var(--alert)}
   .prop{border-top:1px solid var(--line);margin-top:.45rem;padding-top:.6rem;display:grid;gap:.7rem}
   .prop fieldset{border:1px solid var(--line);border-radius:10px;padding:.55rem .65rem;margin:0;
     display:grid;gap:.45rem}
-  .prop legend{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+  .prop legend{font-size:.78rem;color:var(--muted);
     font-weight:700;padding:0 .3rem}
   .prop .row3{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
   .prop input,.prop select{padding:.42rem .5rem;font-size:.85rem}
-  .prop label{font-size:.62rem;margin-bottom:.15rem}
+  .prop label{font-size:.76rem;margin-bottom:.15rem}
   .readout{font-size:.78rem;font-weight:700;color:var(--accent)}
   .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
   .hint{font-size:.72rem;color:var(--muted);font-style:italic}
@@ -277,9 +325,7 @@
   .shot{position:relative;margin:0}
   .shot img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:9px;display:block;
     border:1px solid var(--line);background:var(--line);cursor:pointer}
-  .shot figcaption{font-size:.6rem;color:var(--muted);margin-top:.18rem;line-height:1.3}
-  .shot .badge{position:absolute;top:.25rem;left:.25rem;font-size:.58rem;font-weight:700;
-    padding:.1rem .34rem;border-radius:20px;background:rgba(0,0,0,.62);color:#fff}
+  .shot figcaption{font-size:.72rem;color:var(--muted);margin-top:.18rem;line-height:1.3}
   .quota{font-size:.7rem;color:var(--muted)}
 
   .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;display:none;
@@ -343,7 +389,10 @@
   .hidden{display:none}
   .card{position:relative}
   .card .head{padding-right:46px}
-  .favorite{position:absolute;right:8px;top:8px;width:40px;height:44px;padding:.25rem}
+  .favorite{position:absolute;right:8px;top:8px;width:40px;height:44px;padding:.25rem;
+    display:grid;place-items:center;color:var(--muted)}
+  .favorite[aria-pressed="true"]{color:var(--warn)}
+  .favorite svg{width:19px;height:19px}
   #browse-options{display:grid;gap:.5rem}
   .browse-shortcuts{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
   #filter-toggle{width:auto;padding:.45rem .75rem}
@@ -368,7 +417,7 @@
 <body>
 <div class="ethicsbar" id="ethicsbar" role="note" hidden>
   <div class="ethicsbar-in">
-    <span class="ethicsbar-icon" aria-hidden="true">!</span>
+    <svg class="ethicsbar-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5 2.8 20h18.4z"/><path d="M12 10v4.2"/><path d="M12 17.1v.1"/></svg>
     <p><b>Before you collect.</b> Take from populations of <b>30+ plants</b>, never more than
       <b>30% of the available seed</b>, and get landowner or agency permission first — collecting
       is prohibited in most parks and preserves without a permit. Species flagged
@@ -384,12 +433,14 @@
 
 <main>
   <div class="tabs" role="tablist">
-    <button role="tab" id="tab-find" aria-selected="true">Find seed</button>
-    <button role="tab" id="tab-log" aria-selected="false">My records</button>
+    <button role="tab" id="tab-find" aria-selected="true"
+            aria-controls="pane-find" tabindex="0">Find seed</button>
+    <button role="tab" id="tab-log" aria-selected="false"
+            aria-controls="pane-log" tabindex="-1">My records</button>
   </div>
 
   <!-- ============ FIND ============ -->
-  <section id="pane-find">
+  <section id="pane-find" role="tabpanel" aria-labelledby="tab-find">
     <div class="rail">
     <div class="controls">
       <div>
@@ -429,8 +480,10 @@
         <div class="mapfail" id="mapfail">
           Map unavailable offline. Search above, or enter coordinates:
           <div class="row" style="margin-top:.5rem">
-            <input id="lat" type="number" step="0.001" placeholder="latitude" value="34.416">
-            <input id="lng" type="number" step="0.001" placeholder="longitude" value="-119.698">
+            <div><label for="lat">Latitude</label>
+              <input id="lat" type="number" step="0.001" value="34.416"></div>
+            <div><label for="lng">Longitude</label>
+              <input id="lng" type="number" step="0.001" value="-119.698"></div>
           </div>
         </div>
         <div class="coords">
@@ -470,11 +523,11 @@
     </div>
 
     </div>
-    <div id="out"></div>
+    <div id="out" aria-live="polite"></div>
   </section>
 
   <!-- ============ LOG ============ -->
-  <section id="pane-log" class="hidden">
+  <section id="pane-log" class="hidden" role="tabpanel" aria-labelledby="tab-log">
     <button id="r-new" style="margin-bottom:1rem">Log a collection</button>
     <div id="r-status" role="status"></div>
     <dialog id="collection-dialog" aria-labelledby="collection-title">
@@ -720,12 +773,6 @@ async function ensureTiles(lat, lng, km){
     }
   }
   assignFamilyHues(TAXA);
-  const selectedFamily = $('family-filter').value;
-  const families = [...new Set(TAXA.map(t=>t.family).filter(Boolean))].sort();
-  if (selectedFamily && !families.includes(selectedFamily)) families.push(selectedFamily);
-  $('family-filter').innerHTML = '<option value="">All families</option>' +
-    families.sort().map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join('');
-  $('family-filter').value = selectedFamily;
   $('taxalist').innerHTML = TAXA
     .map(t => `<option value="${esc(t.name)}">${esc(t.common || '')}</option>`).join('');
   $('sub').innerHTML = `${TAXA.length} species near this point · ${want.length} tile${
@@ -874,6 +921,11 @@ function classify(t, today){
 }
 
 /* ---------- rendering ---------- */
+// Drawn rather than a unicode glyph, so it carries the same stroke weight as
+// the rest of the interface at any size.
+const WARN_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true">
+  <path d="M12 4.5 2.8 20h18.4z"/><path d="M12 10v4.2"/><path d="M12 17.1v.1"/></svg>`;
+
 function card(t, local, c, today){
   const el = document.createElement('div');
   el.className = 'card' + (t.sensitive ? ' sensitive' : '');
@@ -883,46 +935,58 @@ function card(t, local, c, today){
   const sub = c.state === 'now' ? `${fmt(t.ripe_start_doy)} – ${fmt(t.ripe_end_doy)}`
             : c.state === 'soon' ? `from ${fmt(t.ripe_start_doy)}` : `ended ${fmt(t.ripe_end_doy)}`;
 
-  const tags = [];
+  // Two tiers, not one undifferentiated row of pills. Facts describe the
+  // species; cautions tell you the model may be wrong or the plant should be
+  // left alone. Mixing them gave a rare-species warning the same weight as a
+  // family name.
+  const facts = [];
+  const flags = [];
+  let stop = false;
+
   // Absent is not the same as false. An unenriched species has no status data at
   // all, and defaulting that to "safe" is the one silent failure this app must
   // not have.
-  if (t.sensitive) tags.push(['bad', 'rare — do not collect']);
-  else if (t.sensitive === undefined) tags.push(['warn', 'status unchecked']);
-  if (t.establishment === 'introduced') tags.push(['grey', 'non-native']);
-  if (t.family) tags.push(['fam', t.family, `--h:${FAMILY_HUE.get(t.family) ?? 0}`]);
-  tags.push(local > 0
-    ? [local >= 8 ? '' : 'grey', `${local} record${local === 1 ? '' : 's'} nearby`]
-    : ['warn', `not recorded within ${$('radius').value} km`]);
-  if (t.elevation) tags.push(['grey', `${t.elevation.lo}–${t.elevation.hi} m`]);
-  if (t.confidence < 0.5) tags.push(['warn', `low confidence · n=${t.n_fruit}`]);
-  if (t.persistence > 0.3) tags.push(['warn', 'fruit persists — may read late']);
-  if (t.method === 'doy_fallback') tags.push(['warn', 'no flowering data']);
-  // How local the window actually is. A fit borrowed from a wider area can miss
-  // a climate gradient, which is exactly how a pooled model goes wrong.
+  if (t.sensitive) { flags.push('<b>Rare — do not collect.</b>'); stop = true; }
+  else if (t.sensitive === undefined) flags.push('Conservation status unchecked.');
+  if (t.establishment === 'introduced') facts.push('non-native');
+  if (t.family) facts.unshift(
+    `<span class="fam" style="--h:${FAMILY_HUE.get(t.family) ?? 0}">${esc(t.family)}</span>`);
+  if (local > 0) facts.push(`${local} record${local === 1 ? '' : 's'} nearby`);
+  else flags.push(`Not recorded within ${$('radius').value} km.`);
+  if (t.elevation) facts.push(`${t.elevation.lo}–${t.elevation.hi} m`);
+  facts.push(`${Math.round(t.confidence * 100)}% confidence`);
+  if (c.state === 'soon') facts.push(`window ends ${fmt(t.ripe_end_doy)}`);
+
+  if (t.confidence < 0.5) flags.push(`Low confidence (n=${t.n_fruit}).`);
+  if (t.persistence > 0.3) flags.push('Fruit persists, so the window may read late.');
+  if (t.method === 'doy_fallback') flags.push('No flowering data.');
   // How far the fit had to reach for enough data. 'cell' is this tile alone.
-  const REACH = {block: ['grey', 'fitted from surrounding area'],
-                 area:  ['warn', 'fitted from a wider area'],
-                 wide:  ['warn', 'fitted from a very wide area — treat as approximate']};
-  if (REACH[t.fit_level]) tags.push(REACH[t.fit_level]);
+  const REACH = {block: 'Fitted from the surrounding area.',
+                 area:  'Fitted from a wider area.',
+                 wide:  'Fitted from a very wide area — treat as approximate.'};
+  if (REACH[t.fit_level]) flags.push(REACH[t.fit_level]);
   if (t.ripe_window_days > WIDE_WINDOW)
-    tags.push(['warn', `${t.ripe_window_days} d window — too vague to time`]);
+    flags.push(`${t.ripe_window_days}‑day window — too vague to time.`);  // non-breaking hyphen
 
   const photo = t.photos && t.photos[0];
   el.innerHTML = `
-    <div class="head ${photo ? '' : 'nophoto'}">
-      ${photo ? `<img class="thumb" loading="lazy" src="${esc(photo.url)}" alt="${esc(t.name)} in fruit">` : ''}
+    <button type="button" class="head ${photo ? '' : 'nophoto'}" aria-expanded="false">
+      ${photo ? `<img class="thumb" loading="lazy" decoding="async" src="${esc(photo.url)}" alt="${esc(t.name)} in fruit">` : ''}
       <div class="name"><strong>${esc(t.common || t.name)}</strong><em>${esc(t.name)}</em></div>
       <div class="when ${c.state}">${when}<small>${sub}</small></div>
-    </div>
+    </button>
     ${timeline(t, today)}
-    <div class="tags">${tags.map(([k, v, style]) =>
-      `<span class="tag ${k}"${style ? ` style="${style}"` : ''}>${esc(v)}</span>`).join('')}</div>`;
+    ${facts.length ? `<p class="meta">${facts.map(f => `<span class="fact">${f}</span>`).join(' <span class="sep">·</span> ')}</p>` : ''}
+    ${flags.length ? `<p class="flags${stop ? ' stop' : ''}">${WARN_ICON}<span>${flags.join(' ')}</span></p>` : ''}`;
 
   const detail = document.createElement('div');
   const favorite = document.createElement('button');
   favorite.className = 'favorite ghost';
-  favorite.textContent = FAVORITES.has(t.taxon_id) ? '★' : '☆';
+  // A drawn star, filled when saved, so it matches the stroke of the other icons.
+  favorite.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"
+    fill="${FAVORITES.has(t.taxon_id) ? 'currentColor' : 'none'}" stroke="currentColor"
+    stroke-width="1.7" stroke-linejoin="round"><path d="m12 3.6 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17
+    6.8 19.8l1-5.9-4.3-4.1 5.9-.8z"/></svg>`;
   favorite.setAttribute('aria-label', 'Favorite ' + (t.common || t.name));
   favorite.setAttribute('aria-pressed', String(FAVORITES.has(t.taxon_id)));
   favorite.onclick = () => {
@@ -933,14 +997,12 @@ function card(t, local, c, today){
     FAVORITES = next; run();
   };
   el.prepend(favorite);
-  const browseInfo = document.createElement('div');
-  browseInfo.className = 'meta';
-  browseInfo.textContent = `Confidence ${Math.round(t.confidence*100)}% · Window ends ${fmt(t.ripe_end_doy)}`;
-  el.append(browseInfo);
   detail.className = 'detail hidden';
   detail.innerHTML = detailHTML(t);
   el.append(detail);
-  el.querySelector('.head').onclick = () => {
+  const head = el.querySelector('.head');
+  head.onclick = () => {
+    head.setAttribute('aria-expanded', String(detail.classList.contains('hidden')));
     detail.classList.toggle('hidden');
     // Built on first open, not on render: a results list holds sixty of these
     // and each map is a live Leaflet instance.
@@ -1099,6 +1161,87 @@ sizeSettings();
 desktopSettings.addEventListener('change', sizeSettings);
 $('search-settings').addEventListener('toggle',()=>{ if ($('search-settings').open) MAP?.invalidateSize(); });
 
+/* ---------- why a search came up empty ----------
+   Search ignores the season, natives and elevation filters on purpose, so a
+   miss has only three possible causes. They used to share one message, which
+   was false for two of them. Checked cheapest first; the same order as the iOS
+   SearchOutcome, so both surfaces explain a miss the same way. */
+let NAMES = null;
+const nameHit = (q, name, common) =>
+  name.toLowerCase().includes(q) || (common || '').toLowerCase().includes(q);
+
+async function explainMiss(query){
+  const out = $('out');
+  const say = (html, action) => {
+    out.innerHTML = `<div class="empty miss">${html}${action ? `<p><button class="ghost" id="missfix">${action.label}</button></p>` : ''}</div>`;
+    if (action) $('missfix').onclick = action.run;
+  };
+
+  // 1. It is here, but the Family or Favorites filter hid it.
+  const hidden = TAXA.find(t => nameHit(query, t.name, t.common));
+  if (hidden){
+    const label = hidden.common ? hidden.common.replace(/^./, c => c.toUpperCase()) : hidden.name;
+    return say(`<strong>${esc(label)}</strong> grows near here but is hidden by a filter.`,
+      {label: 'Clear filters', run: () => {
+        $('family-filter').value = ''; $('favorites-only').checked = false; run(); }});
+  }
+
+  // 2. It is in the dataset, just not near this point. Say where it is.
+  if (!NAMES){
+    out.innerHTML = '<div class="empty miss">Checking the full dataset…</div>';
+    try { NAMES = await (await fetch('names_conus.json')).json(); } catch { NAMES = []; }
+    if ($('search').value.trim().toLowerCase() !== query) return;  // superseded
+  }
+  const row = NAMES.find(([, name, common]) => nameHit(query, name, common));
+  if (row){
+    const [tid, name, common, tileKeys] = row;
+    const label = common ? common.replace(/^./, c => c.toUpperCase()) : name;
+    const near = await nearestRecord(tid, tileKeys);
+    if ($('search').value.trim().toLowerCase() !== query) return;
+    if (!near) return say(`<strong>${esc(label)}</strong> isn't recorded within ${$('radius').value} km.`);
+    return say(`<strong>${esc(label)}</strong> isn't recorded within ${$('radius').value} km. ` +
+      `The nearest fruiting records are about <strong>${near.km.toLocaleString()} km ${near.dir}</strong>.`,
+      {label: 'Look there', run: () => setPosition(near.lat, near.lng, 9)});
+  }
+
+  // 3. Not modeled at all.
+  say(`Nothing called “${esc(query)}” in the dataset. It covers ${NAMES.length.toLocaleString()}
+    species with enough fruiting records to model; check the spelling, or try a genus
+    (<em>Salvia</em>) or a common name (<em>toyon</em>).`);
+}
+
+/// Nearest occurrence cell of a species to the pin, from the tiles it was fitted in.
+async function nearestRecord(tid, tileKeys){
+  const D = TILE_INDEX.tile_deg, C = 0.25;
+  // Look in the three closest tiles only; the nearest cell is all but certain to
+  // be in one of them, and each is a network fetch.
+  const centre = k => { const [r, c] = k.split('_').map(Number); return [(r + .5) * D, (c + .5) * D]; };
+  const ranked = [...tileKeys].sort((a, b) =>
+    haversine(POS.lat, POS.lng, ...centre(a)) - haversine(POS.lat, POS.lng, ...centre(b))).slice(0, 3);
+  let best = null;
+  for (const key of ranked){
+    const entry = TILE_INDEX.tiles.find(t => `${t.tile[0]}_${t.tile[1]}` === key);
+    if (!entry) continue;
+    let blob = TILE_CACHE.get(key);
+    if (!blob){ try { blob = await (await fetch(`${TILE_ROOT}/${entry.file}`)).json(); } catch { continue; }
+                TILE_CACHE.set(key, blob); }
+    const sp = blob.taxa.find(t => t.taxon_id === tid);
+    for (const cell of Object.keys(sp?.cells || {})){
+      const [r, c] = cell.split(',').map(Number);
+      const lat = (r + .5) * C, lng = (c + .5) * C;
+      const km = haversine(POS.lat, POS.lng, lat, lng);
+      if (!best || km < best.km) best = {km, lat, lng};
+    }
+  }
+  if (!best) return null;
+  const dLng = (best.lng - POS.lng) * Math.cos(POS.lat * Math.PI / 180), dLat = best.lat - POS.lat;
+  const deg = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
+  best.dir = ['north','northeast','east','southeast','south','southwest','west','northwest'][Math.round(deg / 45) % 8];
+  // Rounded to what a 25 km grid can honestly claim.
+  best.km = best.km < 100 ? Math.round(best.km / 5) * 5 : Math.round(best.km / 10) * 10;
+  return best;
+}
+
 function renderSearch(query, totals, today){
   const localOf = new Map([...totals].map(([t, n]) => [t.taxon_id, n]));
   const hit = t => {
@@ -1119,12 +1262,7 @@ function renderSearch(query, totals, today){
 
   const out = $('out');
   out.innerHTML = '';
-  if (!matches.length){
-    out.innerHTML = `<div class="empty">Nothing matching “${esc(query)}”.
-      Try a genus (<em>Salvia</em>) or a common name (<em>toyon</em>). The model only
-      covers species with enough fruiting records to fit a window.</div>`;
-    return;
-  }
+  if (!matches.length){ explainMiss(query); return; }
 
   const h = document.createElement('div');
   h.className = 'group';
@@ -1153,9 +1291,14 @@ function run(){
   if (query){ renderSearch(query, totals, today); return; }
 
   const buckets = {now:[], soon:[], past:[]};
+  // Counted under every filter except Family itself, so each option in that
+  // menu says how many results it will actually give. It used to list every
+  // family in the tile, and 79 of 95 led to an empty list.
+  const familyCounts = new Map();
+  const family = $('family-filter').value;
 
   for (const [t, local] of totals){
-    if (!browseMatches(t)) continue;
+    if ($('favorites-only').checked && !FAVORITES.has(t.taxon_id)) continue;
     if (nativesOnly && t.establishment === 'introduced') continue;
     // Elevation is used for presence, not timing: a montane species inside the
     // radius is still not growing at the coast. Margin is generous because the
@@ -1168,6 +1311,8 @@ function run(){
     const c = classify(t, today);
     if (c.state === 'soon' && c.until > 45) continue;
     if (c.state === 'past' && c.since > 21) continue;
+    if (t.family) familyCounts.set(t.family, (familyCounts.get(t.family) || 0) + 1);
+    if (family && t.family !== family) continue;
     const score = (c.state === 'now' ? 1 + c.peak : c.state === 'soon' ? .5 - c.until/200 : .2)
                 * Math.log1p(local) * (0.35 + t.confidence)
                 * (t.establishment === 'introduced' ? 0.3 : 1)
@@ -1175,6 +1320,13 @@ function run(){
                 * (t.ripe_window_days > WIDE_WINDOW ? 0.4 : 1);
     buckets[c.state].push({t, local, c, score});
   }
+
+  const sel = $('family-filter');
+  const fams = [...familyCounts].sort((a, b) => a[0].localeCompare(b[0]));
+  if (family && !familyCounts.has(family)) fams.unshift([family, 0]);  // keep the user's choice visible
+  sel.innerHTML = `<option value="">All families</option>` +
+    fams.map(([f, n]) => `<option value="${esc(f)}">${esc(f)} (${n})</option>`).join('');
+  sel.value = family;
 
   const out = $('out'); out.innerHTML = '';
   const titles = {now:'Collectible now', soon:'Coming up (next 6 weeks)', past:'Just missed'};
@@ -1312,9 +1464,8 @@ async function addPhotos(files, recId, stage){
 
 function shotHTML(p, url){
   return `<figure class="shot" data-photo="${p.id}">
-    <span class="badge">${esc(STAGE_LABEL[p.stage] || p.stage)}</span>
     <img loading="lazy" src="${url}" alt="${esc(STAGE_LABEL[p.stage] || '')} photo">
-    <figcaption>${esc(p.date)}${p.caption ? ' · ' + esc(p.caption) : ''}</figcaption>
+    <figcaption><b>${esc(STAGE_LABEL[p.stage] || p.stage)}</b> · ${esc(p.date)}${p.caption ? ' · ' + esc(p.caption) : ''}</figcaption>
   </figure>`;
 }
 
@@ -1602,7 +1753,7 @@ async function renderLog(){
         ${r.elev != null ? ` · ${Math.round(r.elev)} m` : ''}${r.qty ? ` · ${esc(r.qty)}` : ''}</div>
       ${r.notes ? `<div style="font-size:.84rem">${esc(r.notes)}</div>` : ''}
       <div class="stages">${lc.stages.map(s =>
-        `<span class="stage ${s.cls}">${esc(s.label)}</span>`).join('')}</div>
+        `<span class="stage ${s.cls}">${esc(s.label)}</span>`).join(' <span class="sep">·</span> ')}</div>
       <div style="display:flex;gap:.4rem;margin-top:.2rem">
         <button class="ghost toggle" style="width:auto;padding:.25rem .6rem;font-size:.75rem">Propagation</button>
         <button class="ghost del" style="width:auto;padding:.25rem .6rem;font-size:.75rem">Delete</button>
@@ -1695,9 +1846,9 @@ async function renderPending(){
   const shelf = $('r-pendingshelf');
   freePendingURLs();
   shelf.innerHTML = PENDING.map((b, i) =>
-    `<figure class="shot"><span class="badge">Parent plant</span>
+    `<figure class="shot">
       <img src="${pendingURL(b)}" alt="pending photo">
-      <figcaption>tap to remove</figcaption></figure>`).join('');
+      <figcaption><b>Parent plant</b> · tap to remove</figcaption></figure>`).join('');
   [...shelf.querySelectorAll('.shot')].forEach((fig, i) => {
     fig.onclick = () => { PENDING.splice(i, 1); renderPending(); };
   });
@@ -1895,8 +2046,17 @@ $('r-exportp').onclick = async () => {
 function showTab(which){
   $('tab-find').setAttribute('aria-selected', which === 'find');
   $('tab-log').setAttribute('aria-selected', which === 'log');
+  $('tab-find').tabIndex = which === 'find' ? 0 : -1;
+  $('tab-log').tabIndex = which === 'log' ? 0 : -1;
   $('pane-find').classList.toggle('hidden', which !== 'find');
   $('pane-log').classList.toggle('hidden', which === 'find');
+}
+// Roving tabindex: the tablist is one tab stop, arrows move within it.
+for (const [tab, other] of [[$('tab-find'), $('tab-log')], [$('tab-log'), $('tab-find')]]) {
+  tab.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault(); other.focus(); other.click();
+  });
 }
 $('tab-find').onclick = () => showTab('find');
 $('tab-log').onclick = () => { showTab('log'); renderLog(); };
