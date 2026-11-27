@@ -6,6 +6,11 @@
 <meta name="color-scheme" content="light dark">
 <title>SeedFinder — what has collectible seed near you</title>
 <link rel="icon" type="image/svg+xml" sizes="any" href="./favicon.svg">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14170f" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="SeedFinder">
 <!-- Matches the Leaflet version already used elsewhere on the site. -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -553,6 +558,7 @@
     </div>
 
     </div>
+    <p class="flags" id="netnote" hidden></p>
     <div id="out" aria-live="polite"></div>
   </section>
 
@@ -767,6 +773,11 @@ function tilesFor(lat, lng, km){
   return out;
 }
 
+// Tiles that could not be fetched (no signal, and not saved for offline use).
+// They used to be cached as empty for the rest of the session, which showed a
+// confidently empty list and never retried; now they are retried on the next
+// search and the page says the results are partial.
+const TILE_FAILED = new Set();
 async function ensureTiles(lat, lng, km){
   if (!TILE_INDEX) return;
   const want = tilesFor(lat, lng, km);
@@ -774,9 +785,18 @@ async function ensureTiles(lat, lng, km){
     const key = tileName(...t.tile);
     if (TILE_CACHE.has(key)) return;
     try {
-      TILE_CACHE.set(key, await (await fetch(`${TILE_ROOT}/${t.file}`)).json());
-    } catch { TILE_CACHE.set(key, {taxa: []}); }
+      const res = await fetch(`${TILE_ROOT}/${t.file}`);
+      if (!res.ok) throw new Error(res.status);
+      TILE_CACHE.set(key, await res.json());
+      TILE_FAILED.delete(key);
+    } catch { TILE_FAILED.add(key); }
   }));
+  const missing = want.filter(t => TILE_FAILED.has(tileName(...t.tile))).length;
+  $('netnote').hidden = !missing;
+  $('netnote').innerHTML = missing
+    ? `${WARN_ICON}<span>${missing === want.length ? 'This area' : 'Part of this area'} could not load` +
+      ` without a connection, so results ${missing === want.length ? 'are missing' : 'may be incomplete'}.` +
+      ` Areas you have opened before stay available offline.</span>` : '';
 
   // A species can appear in several loaded tiles with different windows. Prefer
   // the tile the query point sits in, then the most local fit, then the largest
@@ -2379,6 +2399,17 @@ initEthicsBar();
 
 fitRail();
 load();
+
+// Offline support (see sw.js). Only over https or on localhost, where service
+// workers are allowed; anywhere else the app simply runs online-only.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+// Signal back: retry anything that failed and redo the search.
+addEventListener('online', async () => {
+  if (!TILE_FAILED.size) return;
+  await ensureTiles(POS.lat, POS.lng, +$('radius').value);
+  run();
+});
 
 </script>
 </body>
