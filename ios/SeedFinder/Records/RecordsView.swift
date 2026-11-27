@@ -48,7 +48,7 @@ struct RecordsView: View {
                         Button("Export CSV") { exportCSV() }
                         Button("Export JSON") { exportJSON() }
                         Divider()
-                        Button("Import from web export…") { importing = true }
+                        Button("Import records…") { importing = true }
                     } label: { Image(systemName: "square.and.arrow.up") }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
