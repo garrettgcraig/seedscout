@@ -94,6 +94,9 @@ final class FindModel {
     /// Why a search came back empty, so the UI can say something true.
     private(set) var outcome: SearchOutcome = .found
     private(set) var isLoading = false
+    /// False until the first search finishes, so the empty state cannot flash
+    /// "Nothing ready here" during launch before any results exist.
+    private(set) var hasLoaded = false
     private(set) var loadError: String?
     private(set) var speciesCount = 0
 
@@ -122,6 +125,7 @@ final class FindModel {
             // are the ones the user is waiting for.
             guard mine == generation else { return }
             speciesCount = fits.count
+            hasLoaded = true
             families = Array(Set(fits.compactMap(\.family) + (family.isEmpty ? [] : [family]))).sorted()
             let filtered = fits.filter { (family.isEmpty || $0.family == family) &&
                 (!favoritesOnly || favorites.contains($0.taxonID)) }

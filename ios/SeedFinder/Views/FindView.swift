@@ -28,75 +28,28 @@ struct FindView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    if sizeClass == .regular { controls }
-                    else {
-                        DisclosureGroup(settingsSummary,
-                                        isExpanded: $settingsExpanded) { controls }
+            GeometryReader { geo in
+                // Side by side once the window is wide enough to give results
+                // a usable measure (iPad landscape, large iPad windows): the
+                // same 1000-point breakpoint the web client uses. Narrower
+                // windows keep one list, settings first.
+                if sizeClass == .regular && geo.size.width >= 1000 {
+                    HStack(spacing: 0) {
+                        List { browseSection }
+                            .listStyle(.insetGrouped)
+                            .frame(width: 400)
+                        Divider()
+                        List { resultSections }
+                            .listStyle(.insetGrouped)
                     }
-                    HStack {
-                        Toggle("Favorites only", isOn: $model.favoritesOnly)
-                            .onChange(of: model.favoritesOnly) { scheduleRefresh(delay: .zero) }
-                        if sizeClass != .regular {
-                            Button {
-                                withAnimation { filtersExpanded.toggle() }
-                            } label: {
-                                Label(model.family.isEmpty && model.sort == .recommended ? "Filters" : "Filters •",
-                                      systemImage: "line.3.horizontal.decrease")
-                            }
-                            .buttonStyle(.bordered)
-                            .accessibilityValue(filtersExpanded ? "Expanded" : "Collapsed")
-                        }
+                } else {
+                    List {
+                        browseSection
+                        resultSections
                     }
-                    if sizeClass == .regular || filtersExpanded {
-                    Picker("Family", selection: $model.family) {
-                        Text("All families").tag("")
-                        ForEach(model.families, id: \.self) { Text($0).tag($0) }
-                    }.onChange(of: model.family) { scheduleRefresh(delay: .zero) }
-                    Picker("Sort within each season", selection: $model.sort) {
-                        ForEach(FindModel.BrowseSort.allCases) { Text($0.rawValue).tag($0) }
-                    }.onChange(of: model.sort) { scheduleRefresh(delay: .zero) }
-                    }
-                } header: { Text("Browse") }
-                ForEach(FindModel.Bucket.allCases) { bucket in
-                    if let rows = model.buckets[bucket], !rows.isEmpty {
-                        Section {
-                            ForEach(rows) { fit in
-                                HStack {
-                                    NavigationLink(value: fit) {
-                                        // Confidence now lives in the row's fact line, and the
-                                        // window end is already in its header; this line
-                                        // repeated both, with confidence truncated rather
-                                        // than rounded, so the two figures disagreed.
-                                        SpeciesRow(fit: fit, day: model.dayOfYear)
-                                    }
-                                    Button {
-                                        model.toggleFavorite(fit.taxonID)
-                                        scheduleRefresh(delay: .zero)
-                                    } label: {
-                                        Image(systemName: model.favorites.contains(fit.taxonID) ? "star.fill" : "star")
-                                            .frame(width: 44, height: 44)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Favorite \(fit.displayName)")
-                                    .accessibilityValue(model.favorites.contains(fit.taxonID) ? "Selected" : "Not selected")
-                                }
-                            }
-                        } header: {
-                            HStack {
-                                Text(bucket.rawValue).font(Typography.heading(15))
-                                Spacer()
-                                Text("\(rows.count)").foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                if model.buckets.values.allSatisfy(\.isEmpty) && !model.isLoading {
-                    emptyState
+                    .listStyle(.insetGrouped)
                 }
             }
-            .listStyle(.insetGrouped)
             .navigationTitle("SeedFinder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -133,6 +86,80 @@ struct FindView: View {
                 restored = true
                 await model.refresh()
             }
+        }
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder private var browseSection: some View {
+        Section {
+            if sizeClass == .regular { controls }
+            else {
+                DisclosureGroup(settingsSummary,
+                                isExpanded: $settingsExpanded) { controls }
+            }
+            HStack {
+                Toggle("Favorites only", isOn: $model.favoritesOnly)
+                    .onChange(of: model.favoritesOnly) { scheduleRefresh(delay: .zero) }
+                if sizeClass != .regular {
+                    Button {
+                        withAnimation { filtersExpanded.toggle() }
+                    } label: {
+                        Label(model.family.isEmpty && model.sort == .recommended ? "Filters" : "Filters •",
+                              systemImage: "line.3.horizontal.decrease")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityValue(filtersExpanded ? "Expanded" : "Collapsed")
+                }
+            }
+            if sizeClass == .regular || filtersExpanded {
+            Picker("Family", selection: $model.family) {
+                Text("All families").tag("")
+                ForEach(model.families, id: \.self) { Text($0).tag($0) }
+            }.onChange(of: model.family) { scheduleRefresh(delay: .zero) }
+            Picker("Sort within each season", selection: $model.sort) {
+                ForEach(FindModel.BrowseSort.allCases) { Text($0.rawValue).tag($0) }
+            }.onChange(of: model.sort) { scheduleRefresh(delay: .zero) }
+            }
+        } header: { Text("Browse") }
+    }
+
+    @ViewBuilder private var resultSections: some View {
+        ForEach(FindModel.Bucket.allCases) { bucket in
+            if let rows = model.buckets[bucket], !rows.isEmpty {
+                Section {
+                    ForEach(rows) { fit in
+                        HStack {
+                            NavigationLink(value: fit) {
+                                // Confidence now lives in the row's fact line, and the
+                                // window end is already in its header; this line
+                                // repeated both, with confidence truncated rather
+                                // than rounded, so the two figures disagreed.
+                                SpeciesRow(fit: fit, day: model.dayOfYear)
+                            }
+                            Button {
+                                model.toggleFavorite(fit.taxonID)
+                                scheduleRefresh(delay: .zero)
+                            } label: {
+                                Image(systemName: model.favorites.contains(fit.taxonID) ? "star.fill" : "star")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Favorite \(fit.displayName)")
+                            .accessibilityValue(model.favorites.contains(fit.taxonID) ? "Selected" : "Not selected")
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text(bucket.rawValue).font(Typography.heading(15))
+                        Spacer()
+                        Text("\(rows.count)").foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        if model.buckets.values.allSatisfy(\.isEmpty) && !model.isLoading && model.hasLoaded {
+            emptyState
         }
     }
 
