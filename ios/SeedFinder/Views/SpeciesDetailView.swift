@@ -124,7 +124,7 @@ struct SpeciesDetailView: View {
                 .padding(.vertical, 4)
             }
         } footer: {
-            Text("Photos from iNaturalist contributors under Creative Commons licences.")
+            Text("Photos from iNaturalist contributors under Creative Commons licenses.")
         }
     }
 
