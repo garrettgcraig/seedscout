@@ -330,6 +330,7 @@
   .obspop{font-size:.82rem;line-height:1.5}
   .obspop a{font-weight:600}
   .calbtn{width:auto;margin-top:.4rem;padding:.4rem .75rem;font-size:.82rem}
+  .ripecal{margin-top:1rem;width:100%}
   .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
   .hint{font-size:.72rem;color:var(--muted);font-style:italic}
   /* ---- lot photos ---- */
@@ -1073,6 +1074,11 @@ function card(t, local, c, today){
   if (btn) btn.onclick = () => {
     openCollection(t.name);
   };
+  const cal = detail.querySelector('.ripecal');
+  if (cal) cal.onclick = () => {
+    const ics = ripeWindowICS(t);
+    if (ics) download(`ripe-${(t.common || t.name).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.ics`, ics, 'text/calendar');
+  };
   return el;
 }
 
@@ -1203,7 +1209,43 @@ function detailHTML(t){
       <div class="obsnote"></div>
       <button class="ghost obsmore">Load observations</button>
     </div>
+    ${t.sensitive ? '' : '<button type="button" class="ghost ripecal">Add ripe window to calendar</button>'}
     <button class="logbtn">Log a collection of this species</button>`;
+}
+
+/* The next ripe window for a species, as real dates: the one open now (from
+   today to its end) or else the next to open. Same rule as the iOS app. */
+function nextRipeWindow(t){
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const len = ahead(t.ripe_start_doy, t.ripe_end_doy);
+  for (const yr of [today.getFullYear() - 1, today.getFullYear(), today.getFullYear() + 1]){
+    const start = new Date(yr, 0, t.ripe_start_doy);
+    const end = addDays(start, len);
+    if (end >= today) return {start: start < today ? today : start, end, open: start <= today};
+  }
+  return null;
+}
+function ripeWindowICS(t){
+  const w = nextRipeWindow(t);
+  if (!w) return null;
+  const name = t.common ? t.common[0].toUpperCase() + t.common.slice(1) : t.name;
+  const where = GENERIC_LABELS.has(selectedPlaceLabel)
+    ? `${POS.lat.toFixed(3)}, ${POS.lng.toFixed(3)}` : selectedPlaceLabel;
+  const cue = t.tips?.cue ? ` How to tell: ${t.tips.cue}` : '';
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SeedFinder//Ripe window//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:ripe-${t.taxon_id}-${POS.lat.toFixed(2)}-${POS.lng.toFixed(2)}-${icsDay(w.start)}@seedfinder`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${icsDay(w.start)}`,
+    `DTEND;VALUE=DATE:${icsDay(addDays(w.end, 1))}`,
+    `SUMMARY:${icsText(`Seed likely ripe: ${name}`)}`,
+    `LOCATION:${icsText(where)}`,
+    `DESCRIPTION:${icsText(`${t.name} near ${where}. Modeled window ${fmt(t.ripe_start_doy)} to ${fmt(t.ripe_end_doy)}, peak ${fmt(t.ripe_peak_doy)}, ${Math.round(t.confidence * 100)}% confidence.${cue} Check the fruit before collecting. ${searchURL()}`)}`];
+  if (!w.open) lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT9H',
+    `DESCRIPTION:${icsText(`${name} seed is likely ripe near ${where}`)}`, 'END:VALARM');
+  lines.push('END:VEVENT', 'END:VCALENDAR', '');
+  return lines.map(icsFold).join('\r\n');
 }
 
 let FAVORITES = new Set();
@@ -2130,6 +2172,14 @@ $('r-frommap').onclick = () => setRecPos(POS.lat, POS.lng);
    notification for the same day instead. All-day event with a 9 am alert. */
 const icsText = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
 const icsDay = d => isoDate(d).replace(/-/g, '');
+// RFC 5545 caps content lines at 75 octets; longer ones continue on a line
+// that starts with a space. Counted in characters, which is safe for ASCII and
+// only conservative for anything wider.
+const icsFold = line => {
+  const out = [line.slice(0, 75)];
+  for (let i = 75; i < line.length; i += 74) out.push(' ' + line.slice(i, i + 74));
+  return out.join('\r\n');
+};
 function stratificationICS(rec){
   const lc = lifecycle(rec), st = rec.prop.stratify;
   const name = rec.common || rec.species;
@@ -2144,7 +2194,7 @@ function stratificationICS(rec){
     `DESCRIPTION:${icsText(`${st.method} stratification started ${st.start} for ${st.days} days. Logged in SeedFinder.`)}`,
     'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT9H',
     `DESCRIPTION:${icsText(`Ready to sow: ${name}`)}`, 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+    'END:VEVENT', 'END:VCALENDAR', ''].map(icsFold).join('\r\n');
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-cal]');

@@ -8,9 +8,13 @@ struct SpeciesDetailView: View {
     /// and scoped the same way the results list was.
     let centre: CLLocationCoordinate2D
     let radiusKm: Double
+    /// The place name shown in Find, used to title the calendar event.
+    var placeLabel: String = "Map pin"
+    var shareLink: URL? = nil
 
     @Environment(RecordStore.self) private var records
     @State private var loggingLot: SeedLot?
+    @State private var addingToCalendar = false
     @State private var photos: [Photo] = []
     @State private var tips: Tips?
     private let store = try? SpeciesStore()
@@ -31,6 +35,14 @@ struct SpeciesDetailView: View {
                 }
                 if let p = fit.provenance {
                     Label(p, systemImage: "scope").font(.footnote).foregroundStyle(.secondary)
+                }
+                // Never offered for rare or listed species: they are do-not-collect.
+                if !fit.sensitive, RipeWindow.next(for: fit) != nil {
+                    Button {
+                        addingToCalendar = true
+                    } label: {
+                        Label("Add ripe window to calendar", systemImage: "calendar.badge.plus")
+                    }
                 }
             }
 
@@ -64,6 +76,17 @@ struct SpeciesDetailView: View {
         }
         .safeAreaInset(edge: .bottom) { logBar }
         .sheet(item: $loggingLot) { AddLotSheet(prefill: $0) }
+        .sheet(isPresented: $addingToCalendar) {
+            if let window = RipeWindow.next(for: fit) {
+                RipeWindowEventSheet(
+                    fit: fit, window: window,
+                    placeLabel: ["Map pin", "Current location"].contains(placeLabel)
+                        ? String(format: "%.3f, %.3f", centre.latitude, centre.longitude) : placeLabel,
+                    cue: tips?.cue,
+                    link: shareLink ?? URL(string: "https://garrettgcraig.com/seedfinder/")!)
+                .ignoresSafeArea()
+            }
+        }
         .navigationTitle(fit.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .task {

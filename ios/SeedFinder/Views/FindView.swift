@@ -69,7 +69,9 @@ struct FindView: View {
             }
             .navigationDestination(for: Fit.self) {
                 SpeciesDetailView(fit: $0, day: model.dayOfYear,
-                                  centre: model.coordinate, radiusKm: model.radiusKm)
+                                  centre: model.coordinate, radiusKm: model.radiusKm,
+                                  placeLabel: selectedPlaceLabel,
+                                  shareLink: model.shareURL(label: selectedPlaceLabel))
             }
             .searchable(text: $model.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find a specific plant")
             .onChange(of: model.query) { scheduleRefresh(delay: .milliseconds(180)) }
