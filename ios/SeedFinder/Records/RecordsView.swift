@@ -13,6 +13,31 @@ struct RecordsView: View {
     /// way the web app puts the records beside its action rail; on iPhone the
     /// split view collapses and this drives an ordinary push.
     @State private var selection: SeedLot.ID?
+    @State private var query = ""
+    @State private var sort = RecordSort.newest
+
+    /// Same options and matching as the web records list.
+    enum RecordSort: String, CaseIterable, Identifiable {
+        case newest = "Newest first", oldest = "Oldest first"
+        case species = "Species A–Z", due = "Needs attention first"
+        var id: String { rawValue }
+    }
+
+    private var shownLots: [SeedLot] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        let matched = q.isEmpty ? store.lots : store.lots.filter { lot in
+            [lot.species, lot.common, lot.batchCode, lot.batchName, lot.notes, lot.quantity]
+                .compactMap { $0?.lowercased() }.contains { $0.contains(q) }
+        }
+        switch sort {
+        case .newest: return matched.sorted { $0.date > $1.date }
+        case .oldest: return matched.sorted { $0.date < $1.date }
+        case .species: return matched.sorted {
+            ($0.displayName.lowercased(), $1.date) < ($1.displayName.lowercased(), $0.date) }
+        case .due: return matched.sorted {
+            ($0.lifecycle().daysLeft ?? .max, $1.date) < ($1.lifecycle().daysLeft ?? .max, $0.date) }
+        }
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -27,12 +52,17 @@ struct RecordsView: View {
                         description: Text("Find a species that's ready and tap "
                                           + "\"Log a collection\" to start a lot.")
                     )
+                } else if shownLots.isEmpty {
+                    ContentUnavailableView.search(text: query)
                 } else {
-                    Section("Lots") {
-                        ForEach(store.lots) { lot in
+                    Section {
+                        let lots = shownLots
+                        ForEach(lots) { lot in
                             NavigationLink(value: lot.id) { LotRow(lot: lot) }
                         }
-                        .onDelete { idx in idx.map { store.lots[$0] }.forEach(store.delete) }
+                        .onDelete { idx in idx.map { lots[$0] }.forEach(store.delete) }
+                    } header: {
+                        Text(query.isEmpty ? "Lots" : "\(shownLots.count) of \(store.lots.count) lots")
                     }
                 }
 
@@ -41,6 +71,7 @@ struct RecordsView: View {
                 }
             }
             .navigationTitle("My records")
+            .searchable(text: $query, prompt: "Species, batch ID, notes")
             .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -50,6 +81,14 @@ struct RecordsView: View {
                         Divider()
                         Button("Import records…") { importing = true }
                     } label: { Image(systemName: "square.and.arrow.up") }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sort", selection: $sort) {
+                            ForEach(RecordSort.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                    } label: { Image(systemName: "arrow.up.arrow.down") }
+                    .accessibilityLabel("Sort records")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }

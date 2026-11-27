@@ -417,6 +417,11 @@
   footer p{max-width:78ch;margin:0 0 .8rem}
   footer p:last-child{margin-bottom:0}
   .importnote{font-size:.82rem;line-height:1.45;color:var(--ink);margin-top:.35rem}
+  .recfilter{display:grid;grid-template-columns:1fr auto;gap:.6rem;margin-bottom:.4rem}
+  .recfilter[hidden]{display:none}
+  .recfilter select{width:auto}
+  .reccount{font-size:.8rem;color:var(--muted);margin:0 0 .6rem;font-variant-numeric:tabular-nums}
+  .reccount:empty{display:none}
   .importnote:empty{display:none}
   @media (max-width: 999px){ .log-main{margin-top:1rem} }
   a{color:var(--accent)}
@@ -639,6 +644,16 @@
     </div>
     <div class="log-main">
       <div id="attention"></div>
+      <div class="recfilter" id="recfilter" hidden>
+        <div><label for="r-search">Search records</label>
+          <input id="r-search" type="search" autocomplete="off" placeholder="Species, batch ID, notes…"></div>
+        <div><label for="r-sort">Sort</label>
+          <select id="r-sort">
+            <option value="new">Newest first</option><option value="old">Oldest first</option>
+            <option value="species">Species A–Z</option><option value="due">Needs attention first</option>
+          </select></div>
+      </div>
+      <div class="reccount" id="reccount" role="status"></div>
       <div id="reclist"></div>
     </div>
   </section>
@@ -1893,6 +1908,30 @@ function renderAttention(list){
 }
 
 let LOG_RENDER = 0;
+/* Search and sort for the records list; the iOS Records tab offers the same.
+   Search covers what a collector would type: species, common name, batch ID,
+   treatment name and notes. */
+function filterRecords(list){
+  const q = $('r-search').value.trim().toLowerCase();
+  const out = !q ? [...list] : list.filter(r =>
+    [r.species, r.common, batchCode(r), r.batchName, r.notes, r.qty]
+      .some(v => v && String(v).toLowerCase().includes(q)));
+  const sort = $('r-sort').value;
+  const dueRank = r => { const d = lifecycle(r).due; return d ? d.left : Infinity; };
+  if (sort === 'old') out.sort((a, b) => a.date.localeCompare(b.date));
+  else if (sort === 'species') out.sort((a, b) =>
+    (a.common || a.species).localeCompare(b.common || b.species) || b.date.localeCompare(a.date));
+  else if (sort === 'due') out.sort((a, b) => dueRank(a) - dueRank(b) || b.date.localeCompare(a.date));
+  else out.sort((a, b) => b.date.localeCompare(a.date));
+  return out;
+}
+let REC_SEARCH_TIMER = null;
+$('r-search').addEventListener('input', () => {
+  clearTimeout(REC_SEARCH_TIMER);
+  REC_SEARCH_TIMER = setTimeout(renderLog, 150);
+});
+$('r-sort').onchange = renderLog;
+
 async function renderLog(){
   const generation = ++LOG_RENDER;
   const box = $('reclist');
@@ -1906,15 +1945,24 @@ async function renderLog(){
     }
   } catch {}   // IndexedDB blocked (private mode): records still work
   if (generation !== LOG_RENDER) return;
-  const list = records().sort((a,b) => b.date.localeCompare(a.date));
-  renderAttention(list);
+  const all = records().sort((a,b) => b.date.localeCompare(a.date));
+  renderAttention(all);
+  $('recfilter').hidden = !all.length;
+  $('reccount').textContent = '';
 
-  if (!list.length){
+  if (!all.length){
     box.innerHTML = '<div class="empty">No records yet. Open a species in Find seed and choose ' +
       'Log a collection, or start one with the button here.</div>';
     return;
   }
+  const list = filterRecords(all);
+  if ($('r-search').value.trim())
+    $('reccount').textContent = `${list.length} of ${all.length} record${all.length === 1 ? '' : 's'}`;
   box.innerHTML = '';
+  if (!list.length){
+    box.innerHTML = `<div class="empty">No records match “${esc($('r-search').value.trim())}”.</div>`;
+    return;
+  }
   for (const r of list){
     const t = BY_ID.get(r.taxon_id);
     let delta = '';
