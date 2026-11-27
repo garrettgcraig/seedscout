@@ -98,7 +98,9 @@ struct FindView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text("SeedFinder").font(Typography.display(19))
+                    (Text("Seed") + Text("Finder").foregroundStyle(Color.seedAccent))
+                        .font(Typography.display(26))
+                        .accessibilityLabel("SeedFinder")
                 }
             }
             .navigationDestination(for: Fit.self) {
