@@ -414,7 +414,7 @@
   }
   footer{margin:2.5rem auto 0;padding:1rem 1.1rem;color:var(--muted);
     font-size:.76rem;border-top:1px solid var(--line)}
-  footer p{max-width:78ch;margin:0 0 .8rem}
+  footer p{max-width:64ch;margin:0 0 .8rem;text-wrap:pretty}
   footer p:last-child{margin-bottom:0}
   .importnote{font-size:.82rem;line-height:1.45;color:var(--ink);margin-top:.35rem}
   .recfilter{display:grid;grid-template-columns:1fr auto;gap:.6rem;margin-bottom:.4rem}
@@ -1299,7 +1299,8 @@ let selectedPlaceLabel = 'Santa Barbara';
    last one ended rather than in Santa Barbara. The remembered copy deliberately
    leaves the date out: a return visit should be about today. */
 const LAST_KEY = 'seedfinder.lastSearch';
-const GENERIC_LABELS = new Set(['Map pin', 'Current location']);
+// Labels that describe how a point was chosen, not a place: never put in a link.
+const GENERIC_LABELS = new Set(['Map pin', 'Current location', 'Shared place']);
 function readStartState(){
   const p = new URLSearchParams(location.search);
   const lat = parseFloat(p.get('lat')), lng = parseFloat(p.get('lng'));

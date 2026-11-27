@@ -51,7 +51,7 @@ final class FindModel {
     }
     private static let lastKey = "seedfinder.lastSearch"
     static let radiusChoices: [Double] = [10, 25, 50, 100]
-    private static let genericLabels: Set<String> = ["Map pin", "Current location"]
+    private static let genericLabels: Set<String> = ["Map pin", "Current location", "Shared place"]
 
     static func lastPlace() -> SavedPlace? {
         guard let data = UserDefaults.standard.data(forKey: lastKey),
