@@ -2,25 +2,9 @@ import EventKit
 import EventKitUI
 import SwiftUI
 
-/// The next ripe window for a fit, as real dates: the one open now (from today
-/// to its end) or else the next to open. Same rule as the web client's
-/// nextRipeWindow, so both add the same event.
-struct RipeWindow {
-    let start: Date
-    let end: Date
-    let isOpen: Bool
-
+extension RipeWindow {
     static func next(for fit: Fit, today: Date = Date(), calendar: Calendar = .current) -> RipeWindow? {
-        let today = calendar.startOfDay(for: today)
-        let length = DOY.forward(from: fit.ripeStart, to: fit.ripeEnd)
-        let year = calendar.component(.year, from: today)
-        for y in [year - 1, year, year + 1] {
-            guard let jan1 = calendar.date(from: DateComponents(year: y, month: 1, day: 1)),
-                  let start = calendar.date(byAdding: .day, value: fit.ripeStart - 1, to: jan1),
-                  let end = calendar.date(byAdding: .day, value: length, to: start) else { continue }
-            if end >= today { return RipeWindow(start: max(start, today), end: end, isOpen: start <= today) }
-        }
-        return nil
+        next(ripeStart: fit.ripeStart, ripeEnd: fit.ripeEnd, today: today, calendar: calendar)
     }
 }
 

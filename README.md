@@ -193,6 +193,17 @@ radius straddles tile boundaries.
 - **Guards** — non-natives are filtered out by default; rare and listed species are flagged
   *do not collect* and down-ranked; the 30-plants / 30%-of-seed rule and permit requirements are
   stated up front.
+- **Shareable searches** — the address bar carries place, radius, date (when not today) and plant
+  search, so a link reopens the same search; *Share this search* sends it. The last place and radius
+  are remembered on the device. iOS restores the same and shares the same web link.
+- **Directions** — each sighting on a species map gives its distance and opens the device's maps app;
+  the map names the nearest sighting. Points iNaturalist obscures are never given directions.
+- **Ripe window to calendar** — an all-day event for the next window (or the rest of the open one),
+  with a 9 am alert on opening day: an `.ics` on web, Apple's Add Event sheet on iOS. Not offered for
+  rare or listed species.
+- **Offline** — a service worker keeps the app and the species data for areas already opened, so a
+  phone without signal still gets answers; an area never opened says so rather than showing an empty
+  list. Installable to a home screen. Basemap tiles are not cached, per OpenStreetMap's tile policy.
 
 Leaflet and CARTO basemaps are loaded from a CDN for the map, and place search uses Nominatim,
 matching the OpenStreetMap data behind the basemap; queries are debounced and limited to the US. If they are unavailable, the map is
@@ -221,6 +232,19 @@ months"* directly above the stratification fields.
 Records live in `localStorage` and photos in IndexedDB, both browser-local and never uploaded.
 Export to CSV or JSON. The CSV carries the full propagation schedule alongside `modelled_peak_doy`
 and `days_from_peak`; that signed offset is the ground truth needed to recalibrate `RIPE_QUANTILES`.
+*Import records* reads either the web JSON export or the iOS bundle, merging by id.
+
+**Stratification reminders.** iOS schedules a local notification at 9 am on the day each unsown
+lot's stratification ends, rebuilt from the records on every save. A web page cannot schedule a
+notification months ahead, so lots still stratifying offer *Add reminder to calendar* instead.
+
+## Tests
+
+```bash
+python3 tests/test_establishment_fill.py
+swiftc tests/RipeWindow.swift ios/SeedFinder/Data/Phenology.swift ios/SeedFinder/Data/Models.swift -o /tmp/ripe && /tmp/ripe
+swiftc tests/BatchRecords.swift ios/SeedFinder/Records/SeedLot.swift -o /tmp/batch && /tmp/batch
+```
 
 ## Layout
 
@@ -338,8 +362,6 @@ the plant, not low confidence in the estimate.
   certainly want different values; family is already in the payload as a rough proxy.
 - **Growing-degree-day anchoring** via Daymet or PRISM, so windows shift with an early or late year
   instead of resting on a climatological average.
-- **Offline tile caching** and a service worker, so the map works without signal in the field.
-- **iOS client** against the same `species_<region>.json`.
 
 ## Collection ethics
 

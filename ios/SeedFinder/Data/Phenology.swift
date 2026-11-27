@@ -86,3 +86,26 @@ extension Fit {
 
     var readsLate: Bool { (persistence ?? 0) > 0.3 }
 }
+
+/// The next ripe window as real dates: the one open now (from today to its end)
+/// or else the next to open. Windows may wrap the new year. Same rule as the
+/// web client's nextRipeWindow, so both add the same calendar event.
+struct RipeWindow: Equatable {
+    let start: Date
+    let end: Date
+    let isOpen: Bool
+
+    static func next(ripeStart: Int, ripeEnd: Int, today: Date = Date(),
+                     calendar: Calendar = .current) -> RipeWindow? {
+        let today = calendar.startOfDay(for: today)
+        let length = DOY.forward(from: ripeStart, to: ripeEnd)
+        let year = calendar.component(.year, from: today)
+        for y in [year - 1, year, year + 1] {
+            guard let jan1 = calendar.date(from: DateComponents(year: y, month: 1, day: 1)),
+                  let start = calendar.date(byAdding: .day, value: ripeStart - 1, to: jan1),
+                  let end = calendar.date(byAdding: .day, value: length, to: start) else { continue }
+            if end >= today { return RipeWindow(start: max(start, today), end: end, isOpen: start <= today) }
+        }
+        return nil
+    }
+}
