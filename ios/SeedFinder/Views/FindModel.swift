@@ -36,6 +36,60 @@ final class FindModel {
         UserDefaults.standard.set(Array(favorites), forKey: "seedfinder.favorites")
     }
 
+    // MARK: Remembered and shared searches
+    //
+    // Same contract as the web client: the last place and radius are kept on
+    // this device so the next launch starts where the last one ended, without
+    // the date (a return visit is about today). A shared link carries the date
+    // only when it is not today, and coordinates to three decimals (~100 m).
+
+    struct SavedPlace: Codable {
+        var lat: Double
+        var lng: Double
+        var label: String
+        var radiusKm: Double
+    }
+    private static let lastKey = "seedfinder.lastSearch"
+    static let radiusChoices: [Double] = [10, 25, 50, 100]
+    private static let genericLabels: Set<String> = ["Map pin", "Current location"]
+
+    static func lastPlace() -> SavedPlace? {
+        guard let data = UserDefaults.standard.data(forKey: lastKey),
+              let s = try? JSONDecoder().decode(SavedPlace.self, from: data),
+              abs(s.lat) <= 90, abs(s.lng) <= 180 else { return nil }
+        return s
+    }
+
+    func rememberPlace(label: String) {
+        let s = SavedPlace(lat: coordinate.latitude, lng: coordinate.longitude,
+                           label: label, radiusKm: radiusKm)
+        if let data = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(data, forKey: Self.lastKey)
+        }
+    }
+
+    /// A link to the same search on the web app, which anyone can open.
+    func shareURL(label: String) -> URL {
+        var c = URLComponents(string: "https://garrettgcraig.com/seedfinder/")!
+        var items = [
+            URLQueryItem(name: "lat", value: String(format: "%.3f", coordinate.latitude)),
+            URLQueryItem(name: "lng", value: String(format: "%.3f", coordinate.longitude)),
+            URLQueryItem(name: "r", value: String(Int(radiusKm))),
+        ]
+        if !Calendar.current.isDateInToday(date) {
+            items.append(URLQueryItem(name: "d", value: ISO.string(date)))
+        }
+        if !Self.genericLabels.contains(label) { items.append(URLQueryItem(name: "place", value: label)) }
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty { items.append(URLQueryItem(name: "q", value: q)) }
+        c.queryItems = items
+        return c.url!
+    }
+
+    func shareTitle(label: String) -> String {
+        "Native seed near \(Self.genericLabels.contains(label) ? "this spot" : label)"
+    }
+
     private(set) var buckets: [Bucket: [Fit]] = [:]
     /// Why a search came back empty, so the UI can say something true.
     private(set) var outcome: SearchOutcome = .found

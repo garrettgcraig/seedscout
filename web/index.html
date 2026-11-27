@@ -152,6 +152,9 @@
     font-size:.78rem;color:var(--muted)}
   .coords b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
   .maphint{font-size:.8rem;color:var(--muted);font-style:italic}
+  .sharerow{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+  .sharerow button{width:auto;padding:.45rem .8rem}
+  #share-status{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere;min-width:0}
   .mapfail{display:none;background:var(--warn-soft);border-left:3px solid var(--warn);
     border-radius:8px;padding:.6rem .7rem;font-size:.8rem}
   .mapfail.on{display:block}
@@ -524,6 +527,10 @@
         Only species that grow at this elevation</label>
       <button id="go">Show ready seed</button>
       </details>
+      <div class="sharerow">
+        <button type="button" id="share" class="ghost">Share this search</button>
+        <span id="share-status" role="status"></span>
+      </div>
     </div>
 
 
@@ -806,7 +813,10 @@ async function ensureTiles(lat, lng, km){
 async function load(){
   TILE_INDEX = await (await fetch(`${TILE_ROOT}/index.json`)).json();
   MODEL = TILE_INDEX;
-  $('date').value = $('r-date').value = new Date().toISOString().slice(0,10);
+  // Local date, not toISOString(): that is UTC, which in the evening across the
+  // US is already tomorrow, so the app opened on the wrong day after ~4 pm.
+  $('date').value = $('r-date').value = isoDate(new Date());
+  applyStartState(readStartState());
   initMap();
   await refreshPosition();
   renderLog();
@@ -1173,6 +1183,67 @@ $('filter-toggle').onclick = () => {
   $('filter-toggle').setAttribute('aria-expanded', String(expanded));
 };
 let selectedPlaceLabel = 'Santa Barbara';
+
+/* ---------- remembered and shareable searches ----------
+   The address bar carries the search, so a reload, a bookmark or a link sent to
+   a field partner opens the same place, radius and date. Separately, the last
+   place and radius are kept on this device so the next visit starts where the
+   last one ended rather than in Santa Barbara. The remembered copy deliberately
+   leaves the date out: a return visit should be about today. */
+const LAST_KEY = 'seedfinder.lastSearch';
+const GENERIC_LABELS = new Set(['Map pin', 'Current location']);
+function readStartState(){
+  const p = new URLSearchParams(location.search);
+  const lat = parseFloat(p.get('lat')), lng = parseFloat(p.get('lng'));
+  if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180)
+    return {lat, lng, label: p.get('place') || 'Shared place', r: p.get('r'),
+            d: p.get('d'), q: p.get('q'), fromLink: true};
+  try {
+    const s = JSON.parse(localStorage.getItem(LAST_KEY));
+    if (s && Number.isFinite(s.lat) && Number.isFinite(s.lng)) return s;
+  } catch {}
+  return null;
+}
+function applyStartState(s){
+  if (!s) return;
+  POS = {lat: +(+s.lat).toFixed(5), lng: +(+s.lng).toFixed(5)};
+  selectedPlaceLabel = s.label || 'Map pin';
+  $('lat').value = POS.lat; $('lng').value = POS.lng;
+  if (s.r && [...$('radius').options].some(o => o.value === String(s.r))) $('radius').value = String(s.r);
+  if (s.fromLink && /^\d{4}-\d{2}-\d{2}$/.test(s.d || '')) $('date').value = s.d;
+  if (s.fromLink && s.q) $('search').value = s.q.slice(0, 80);
+}
+// Three decimals is about 100 m: plenty for a 10 km search, and a shared link
+// does not pin someone's exact position.
+function searchURL(){
+  const p = new URLSearchParams({lat: POS.lat.toFixed(3), lng: POS.lng.toFixed(3), r: $('radius').value});
+  if ($('date').value && $('date').value !== isoDate(new Date())) p.set('d', $('date').value);
+  if (selectedPlaceLabel && !GENERIC_LABELS.has(selectedPlaceLabel)) p.set('place', selectedPlaceLabel);
+  const q = $('search').value.trim();
+  if (q) p.set('q', q);
+  return `${location.origin}${location.pathname}?${p}`;
+}
+function rememberSearch(){
+  try { history.replaceState(null, '', searchURL()); } catch {}
+  try { localStorage.setItem(LAST_KEY, JSON.stringify(
+    {lat: POS.lat, lng: POS.lng, label: selectedPlaceLabel, r: $('radius').value})); } catch {}
+}
+let SHARE_TIMER = null;
+function shareStatus(text){
+  $('share-status').textContent = text;
+  clearTimeout(SHARE_TIMER);
+  SHARE_TIMER = setTimeout(() => { $('share-status').textContent = ''; }, 6000);
+}
+$('share').onclick = async () => {
+  const url = searchURL();
+  const title = `Native seed near ${GENERIC_LABELS.has(selectedPlaceLabel) ? 'this spot' : selectedPlaceLabel}`;
+  if (navigator.share){
+    try { await navigator.share({title, url}); return; }
+    catch (e){ if (e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(url); shareStatus('Link copied.'); }
+  catch { shareStatus(url); }   // no clipboard access: show it so it can be copied by hand
+};
 function updateSettingsSummary(){
   const date = $('date').value;
   const label = date ? new Date(date + 'T12:00').toLocaleDateString(undefined, {month:'short',day:'numeric'}) : 'Choose date';
@@ -1301,6 +1372,7 @@ function renderSearch(query, totals, today){
 function run(){
   updateSettingsSummary();
   if (!TILE_INDEX) return;
+  rememberSearch();
   const lat = POS.lat, lng = POS.lng, km = +$('radius').value;
   const today = doy(new Date($('date').value + 'T12:00'));
   const nativesOnly = $('kind').value === 'native';
@@ -1476,7 +1548,7 @@ async function addPhotos(files, recId, stage){
     catch { blob = f; }   // unreadable/exotic format: store the original
     const p = {
       id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
-      rec: recId, stage, date: new Date().toISOString().slice(0,10),
+      rec: recId, stage, date: isoDate(new Date()),
       caption: '', blob, bytes: blob.size,
     };
     await putPhoto(p);

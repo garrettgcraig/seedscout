@@ -18,6 +18,9 @@ struct FindView: View {
     @State private var settingsExpanded = false
     @State private var filtersExpanded = false
     @State private var selectedPlaceLabel = "Santa Barbara"
+    /// Restore the remembered place once per launch, not every time the tab
+    /// reappears, or switching tabs would throw away a map the user had moved.
+    @State private var restored = false
 
     private var settingsSummary: String {
         "\(selectedPlaceLabel) · \(model.date.formatted(.dateTime.month(.abbreviated).day())) · \(Int(model.radiusKm)) km"
@@ -97,6 +100,14 @@ struct FindView: View {
             .navigationTitle("SeedFinder")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: model.shareURL(label: selectedPlaceLabel),
+                              subject: Text(model.shareTitle(label: selectedPlaceLabel)),
+                              message: Text(model.shareTitle(label: selectedPlaceLabel))) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share this search")
+                }
                 ToolbarItem(placement: .principal) {
                     (Text("Seed") + Text("Finder").foregroundStyle(Color.seedAccent))
                         .font(Typography.display(26))
@@ -109,7 +120,19 @@ struct FindView: View {
             }
             .searchable(text: $model.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find a specific plant")
             .onChange(of: model.query) { scheduleRefresh(delay: .milliseconds(180)) }
-            .task { await model.refresh() }
+            .task {
+                if !restored, let saved = FindModel.lastPlace() {
+                    restored = true
+                    selectedPlaceLabel = saved.label
+                    if FindModel.radiusChoices.contains(saved.radiusKm) { model.radiusKm = saved.radiusKm }
+                    let c = CLLocationCoordinate2D(latitude: saved.lat, longitude: saved.lng)
+                    model.coordinate = c
+                    camera = .region(MKCoordinateRegion(center: c,
+                        latitudinalMeters: model.radiusKm * 2600, longitudinalMeters: model.radiusKm * 2600))
+                }
+                restored = true
+                await model.refresh()
+            }
         }
     }
 
@@ -120,9 +143,12 @@ struct FindView: View {
             .onChange(of: model.date) { scheduleRefresh(delay: .zero) }
 
         Picker("Within", selection: $model.radiusKm) {
-            ForEach([10.0, 25, 50, 100], id: \.self) { Text("\(Int($0)) km").tag($0) }
+            ForEach(FindModel.radiusChoices, id: \.self) { Text("\(Int($0)) km").tag($0) }
         }
-        .onChange(of: model.radiusKm) { scheduleRefresh(delay: .zero) }
+        .onChange(of: model.radiusKm) {
+            model.rememberPlace(label: selectedPlaceLabel)
+            scheduleRefresh(delay: .zero)
+        }
 
         placeField
         map
@@ -226,6 +252,7 @@ struct FindView: View {
     private func moveTo(_ c: CLLocationCoordinate2D, recenter: Bool, label: String = "Map pin") {
         selectedPlaceLabel = label
         model.coordinate = c
+        model.rememberPlace(label: label)
         // Keep place results biased to wherever the user is now looking.
         places.region = MKCoordinateRegion(center: c, latitudinalMeters: 200_000,
                                            longitudinalMeters: 200_000)
