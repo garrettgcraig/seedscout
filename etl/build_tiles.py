@@ -227,6 +227,10 @@ def build(rows_paths: list[Path], out_dir: Path, region: str) -> dict:
             "cells": dict(b.cells),
         })
 
+    # Fill native/introduced gaps the per-place listings leave (see the module).
+    from establishment_fill import apply as fill_establishment
+    print(f"  establishment gaps filled: {fill_establishment(tiles)}")
+
     out_dir.mkdir(parents=True, exist_ok=True)
     for f in out_dir.glob("*.json"):
         f.unlink()

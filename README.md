@@ -125,6 +125,18 @@ Deciding on presence alone, as an earlier version did, put staghorn sumac at 10 
 against 5,875 native ones in Massachusetts and hid it from the natives-only default. It is now the
 top result there in late summer.
 
+Unknown status is kept in the natives-only view, because it usually means a native that simply
+lacks a listing. That let known invasives through where iNaturalist has no listing for the tile,
+so `etl/establishment_fill.py` fills three kinds of gap, and only gaps: a species introduced
+wherever it is listed and native nowhere is treated as introduced in its unlisted tiles too
+(Japanese honeysuckle, watercress, *Lantana*); a subspecies or variety with no listing inherits
+that status from its species (*Trapa natans bispinosa*, *Vicia villosa varia*); and a short,
+cited override list handles what no listing can settle (European *Phragmites australis* subsp.
+*australis*, whose species is native here through a different lineage). Each filled entry records
+its reason in `establishment_basis`. A few species this rule hides from the native view, such as
+*Cyperus esculentus* and *Rhinanthus minor*, are treated as native in parts of North America by
+some floras; they still appear under "Everything".
+
 ## Known limits
 
 - **`RIPE_QUANTILES` is calibrated against nine species.** It is the first thing to revisit when

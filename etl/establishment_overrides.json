@@ -1,0 +1,8 @@
+{
+  "_about": "Taxa whose native/introduced status cannot be inferred from iNaturalist's per-place listings, set from published sources. Applied everywhere in the lower 48, after the per-tile counts. Keep this short and cite every entry.",
+  "556361": {
+    "name": "Phragmites australis australis",
+    "establishment": "introduced",
+    "source": "Saltonstall 2002, PNAS 99:2445 - the European lineage (haplotype M) introduced to North America; the native lineage is subsp. americanus."
+  }
+}
