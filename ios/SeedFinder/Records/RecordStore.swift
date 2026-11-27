@@ -52,6 +52,7 @@ final class RecordStore {
             try enc.encode(lots).write(to: lotsURL, options: .atomic)
             try enc.encode(photos).write(to: photosURL, options: .atomic)
             loadError = nil
+            StratificationReminders.sync(lots)
         } catch {
             loadError = "Could not save records: \(error.localizedDescription)"
         }

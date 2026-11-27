@@ -322,6 +322,7 @@
   .prop input,.prop select{padding:.42rem .5rem;font-size:.85rem}
   .prop label{font-size:.76rem;margin-bottom:.15rem}
   .readout{font-size:.78rem;font-weight:700;color:var(--accent)}
+  .calbtn{width:auto;margin-top:.4rem;padding:.4rem .75rem;font-size:.82rem}
   .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
   .hint{font-size:.72rem;color:var(--muted);font-style:italic}
   /* ---- lot photos ---- */
@@ -1730,7 +1731,10 @@ function propPanel(rec, taxon, photos = []){
     ? `<div class="hint">Handling note: ${esc(taxon.tips.handling)}</div>` : '';
   const strat = lc.stratEnd
     ? `<div class="readout ${lc.due ? (lc.due.left > 0 ? 'active' : 'late') : ''}">
-         ${lc.due ? esc(lc.due.text) : `finished ${isoDate(lc.stratEnd)}`}</div>` : '';
+         ${lc.due ? esc(lc.due.text) : `finished ${isoDate(lc.stratEnd)}`}</div>
+       ${lc.due && lc.due.left > 0
+         ? `<button type="button" class="ghost calbtn" data-cal="${esc(rec.id)}">Add reminder to calendar</button>`
+         : ''}` : '';
   const germ = lc.rate != null
     ? `<div class="readout">${Math.round(lc.rate*100)}% germinated
         (${+p.germ.count} of ${+p.sown.count})${lc.days != null ? ' · ' + lc.days + ' days from sowing' : ''}</div>` : '';
@@ -2073,6 +2077,37 @@ $('r-here').onclick = () => {
     {enableHighAccuracy:true, timeout:15000});
 };
 $('r-frommap').onclick = () => setRecPos(POS.lat, POS.lng);
+
+/* A calendar event for the day stratification ends. A web page cannot schedule
+   a notification months ahead, but every calendar can; on a phone the file
+   opens straight into Add to Calendar. The iOS app schedules a local
+   notification for the same day instead. All-day event with a 9 am alert. */
+const icsText = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+const icsDay = d => isoDate(d).replace(/-/g, '');
+function stratificationICS(rec){
+  const lc = lifecycle(rec), st = rec.prop.stratify;
+  const name = rec.common || rec.species;
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//SeedFinder//Stratification//EN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:strat-${rec.id}@seedfinder`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${icsDay(lc.stratEnd)}`,
+    `DTEND;VALUE=DATE:${icsDay(addDays(lc.stratEnd, 1))}`,
+    `SUMMARY:${icsText(`Ready to sow: ${name} (${batchCode(rec)})`)}`,
+    `DESCRIPTION:${icsText(`${st.method} stratification started ${st.start} for ${st.days} days. Logged in SeedFinder.`)}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT9H',
+    `DESCRIPTION:${icsText(`Ready to sow: ${name}`)}`, 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-cal]');
+  if (!b) return;
+  const rec = records().find(r => r.id === b.dataset.cal);
+  if (!rec || !lifecycle(rec).stratEnd) return;
+  const who = (rec.common || rec.species).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  download(`sow-${who}-${isoDate(lifecycle(rec).stratEnd)}.ics`, stratificationICS(rec), 'text/calendar');
+});
 
 function download(name, text, type){
   const a = document.createElement('a');
