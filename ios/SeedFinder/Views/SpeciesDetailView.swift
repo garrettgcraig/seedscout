@@ -53,7 +53,7 @@ struct SpeciesDetailView: View {
                 LabeledContent("Window width", value: "\(fit.ripeDays) days")
                 if fit.readsLate {
                     Text("Dried fruit persists on this species long after the seed is ripe, so the "
-                         + "modelled window can read late. Judge by the condition of the fruit cluster.")
+                         + "modeled window can read late. Judge by the condition of the fruit cluster.")
                     .font(.footnote).foregroundStyle(.secondary)
                 }
                 if fit.confidence < 0.5 {

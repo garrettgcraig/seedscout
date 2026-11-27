@@ -9,10 +9,14 @@ struct RecordsView: View {
     @State private var exportKind: UTType = .commaSeparatedText
     @State private var importing = false
     @State private var importNote: String?
+    /// The open lot. On iPad it fills the detail column beside the list, the
+    /// way the web app puts the records beside its action rail; on iPhone the
+    /// split view collapses and this drives an ordinary push.
+    @State private var selection: SeedLot.ID?
 
     var body: some View {
-        NavigationStack {
-            List {
+        NavigationSplitView {
+            List(selection: $selection) {
                 if let error = store.loadError { Text(error).foregroundStyle(.red) }
                 if !store.needingAttention.isEmpty { attention }
 
@@ -26,7 +30,7 @@ struct RecordsView: View {
                 } else {
                     Section("Lots") {
                         ForEach(store.lots) { lot in
-                            NavigationLink(value: lot) { LotRow(lot: lot) }
+                            NavigationLink(value: lot.id) { LotRow(lot: lot) }
                         }
                         .onDelete { idx in idx.map { store.lots[$0] }.forEach(store.delete) }
                     }
@@ -37,7 +41,7 @@ struct RecordsView: View {
                 }
             }
             .navigationTitle("My records")
-            .navigationDestination(for: SeedLot.self) { LotDetailView(lot: $0) }
+            .navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 460)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -67,6 +71,16 @@ struct RecordsView: View {
                     importNote = "That file could not be read as a SeedFinder export."
                 }
             }
+        } detail: {
+            NavigationStack {
+                if let id = selection, let lot = store.lots.first(where: { $0.id == id }) {
+                    // A fresh view per lot: LotDetailView keeps its own @State copy.
+                    LotDetailView(lot: lot).id(id)
+                } else {
+                    ContentUnavailableView("Choose a lot", systemImage: "leaf",
+                        description: Text("Pick a collection or treatment batch to see its propagation schedule."))
+                }
+            }
         }
     }
 
@@ -74,7 +88,7 @@ struct RecordsView: View {
         Section {
             ForEach(store.needingAttention) { lot in
                 let lc = lot.lifecycle()
-                NavigationLink(value: lot) {
+                NavigationLink(value: lot.id) {
                     HStack {
                         Image(systemName: lc.isOverdue ? "exclamationmark.circle.fill" : "clock.fill")
                             .foregroundStyle(lc.isOverdue ? .red : .orange)
