@@ -99,6 +99,9 @@ final class FindModel {
     private(set) var hasLoaded = false
     private(set) var loadError: String?
     private(set) var speciesCount = 0
+    /// When the bundled data was built, shown under the settings like the web
+    /// client's header line, so a stale install is visible.
+    private(set) var dataBuilt: String?
 
     private let store: SpeciesStore?
     private var generation = 0
@@ -126,6 +129,10 @@ final class FindModel {
             guard mine == generation else { return }
             speciesCount = fits.count
             hasLoaded = true
+            if dataBuilt == nil {
+                await store.loadMetadata()
+                dataBuilt = await store.generated
+            }
             families = Array(Set(fits.compactMap(\.family) + (family.isEmpty ? [] : [family]))).sorted()
             let filtered = fits.filter { (family.isEmpty || $0.family == family) &&
                 (!favoritesOnly || favorites.contains($0.taxonID)) }

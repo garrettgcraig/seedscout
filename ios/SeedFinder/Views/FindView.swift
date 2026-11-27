@@ -123,7 +123,13 @@ struct FindView: View {
                 ForEach(FindModel.BrowseSort.allCases) { Text($0.rawValue).tag($0) }
             }.onChange(of: model.sort) { scheduleRefresh(delay: .zero) }
             }
-        } header: { Text("Browse") }
+        } header: { Text("Browse") } footer: {
+            if model.hasLoaded {
+                Text("\(model.speciesCount) species near this point"
+                     + (model.dataBuilt.map { " · built \($0)" } ?? ""))
+                    .monospacedDigit()
+            }
+        }
     }
 
     @ViewBuilder private var resultSections: some View {
