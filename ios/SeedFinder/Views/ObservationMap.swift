@@ -22,6 +22,7 @@ struct ObservationMap: View {
     @State private var error: String?
     @State private var loaded = false
     @State private var camera: MapCameraPosition = .automatic
+    @State private var selected: Int?
 
     private struct Page: Decodable {
         let total_results: Int
@@ -30,6 +31,10 @@ struct ObservationMap: View {
     private struct Sighting: Decodable, Identifiable {
         let id: Int
         let geojson: Geometry?
+        let observed_on: String?
+        /// iNaturalist scrambles these, usually to protect a rare plant, so they
+        /// are never offered as somewhere to go.
+        let obscured: Bool?
         struct Geometry: Decodable { let coordinates: [Double] }
         var coordinate: CLLocationCoordinate2D {
             CLLocationCoordinate2D(latitude: geojson!.coordinates[1], longitude: geojson!.coordinates[0])
@@ -55,9 +60,14 @@ struct ObservationMap: View {
                         Annotation("Observation", coordinate: p.coordinate) {
                             Circle()
                                 .fill(Color(red: 1, green: 0.23, blue: 0.19))
-                                .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-                                .frame(width: 12, height: 12)
+                                .overlay(Circle().strokeBorder(.white, lineWidth: selected == p.id ? 3 : 2))
+                                .frame(width: selected == p.id ? 18 : 12, height: selected == p.id ? 18 : 12)
                                 .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
+                                .frame(width: 30, height: 30)          // a fingertip-sized target
+                                .contentShape(Rectangle())
+                                .onTapGesture { selected = p.id }
+                                .accessibilityLabel("Observation \(distanceText(p)) away")
+                                .accessibilityAddTraits(.isButton)
                         }
                         .annotationTitles(.hidden)
                     }
@@ -75,8 +85,27 @@ struct ObservationMap: View {
             }
             .listRowInsets(EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6))
 
+            if let p = points.first(where: { $0.id == selected }) {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(p.observed_on ?? "Date unknown") · \(distanceText(p)) away")
+                            .font(.subheadline)
+                        if p.obscured == true {
+                            Text("Location hidden by iNaturalist").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if p.obscured != true {
+                        Link("Directions", destination: URL(string:
+                            "https://maps.apple.com/?daddr=\(p.coordinate.latitude),\(p.coordinate.longitude)")!)
+                            .buttonStyle(.borderedProminent).controlSize(.small)
+                    }
+                    Link("iNaturalist", destination: URL(string: "https://www.inaturalist.org/observations/\(p.id)")!)
+                        .buttonStyle(.bordered).controlSize(.small)
+                }
+            }
             if let total {
-                Text("\(loadedCount) of \(total) observations loaded").font(.caption)
+                Text("\(loadedCount) of \(total) observations loaded" + nearestText).font(.caption)
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             if hasMore {
@@ -99,6 +128,23 @@ struct ObservationMap: View {
             }
         }
         .task { if !loaded { await load() } }
+    }
+
+    private func km(_ p: Sighting) -> Double {
+        CLLocation(latitude: centre.latitude, longitude: centre.longitude)
+            .distance(from: CLLocation(latitude: p.coordinate.latitude, longitude: p.coordinate.longitude)) / 1000
+    }
+
+    private func format(_ km: Double) -> String {
+        km < 10 ? String(format: "%.1f km", km) : "\(Int(km.rounded())) km"
+    }
+
+    private func distanceText(_ p: Sighting) -> String { format(km(p)) }
+
+    /// Same wording as the web map's count line.
+    private var nearestText: String {
+        guard let near = points.filter({ $0.obscured != true }).map(km).min() else { return "" }
+        return " · nearest \(format(near)) away"
     }
 
     private func load() async {

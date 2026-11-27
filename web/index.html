@@ -327,6 +327,8 @@
   .prop input,.prop select{padding:.42rem .5rem;font-size:.85rem}
   .prop label{font-size:.76rem;margin-bottom:.15rem}
   .readout{font-size:.78rem;font-weight:700;color:var(--accent)}
+  .obspop{font-size:.82rem;line-height:1.5}
+  .obspop a{font-weight:600}
   .calbtn{width:auto;margin-top:.4rem;padding:.4rem .75rem;font-size:.82rem}
   .readout.late{color:var(--alert)} .readout.active{color:var(--warn)}
   .hint{font-size:.72rem;color:var(--muted);font-style:italic}
@@ -1074,6 +1076,13 @@ function card(t, local, c, today){
   return el;
 }
 
+// Directions open the platform's own maps app: Apple Maps on Apple devices,
+// Google Maps everywhere else (its link also opens the Android app).
+const APPLE_DEVICE = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+const directionsURL = (la, ln) => APPLE_DEVICE
+  ? `https://maps.apple.com/?daddr=${la},${ln}`
+  : `https://www.google.com/maps/dir/?api=1&destination=${la},${ln}`;
+
 /* ---------- research-grade observation locations ----------
    Live sightings are independent of the phenology dataset: all dates, with
    no flower/fruit annotation requirement. Both clients use the same query. */
@@ -1091,7 +1100,7 @@ async function mountObsMap(detail, t){
   const note = detail.querySelector('.obsnote');
   const more = detail.querySelector('.obsmore');
   const seen = new Set();
-  let cursor = null, total = null, loaded = 0, mapped = 0, busy = false;
+  let cursor = null, total = null, loaded = 0, mapped = 0, busy = false, nearest = null;
   async function load(){
     if (busy) return;
     busy = true; more.disabled = true;
@@ -1113,18 +1122,35 @@ async function mountObsMap(detail, t){
         const coords = obs.geojson?.coordinates;
         if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) continue;
         mapped++;
+        const [olng, olat] = coords;
+        const km = haversine(lat, lng, olat, olng);
+        // Obscured points are deliberately scrambled by iNaturalist, usually to
+        // protect rare plants, so they are never offered as somewhere to go.
+        if (!obs.obscured && (nearest == null || km < nearest)) nearest = km;
         const popup = document.createElement('div');
-        popup.textContent = (obs.observed_on || 'Date unknown') + ' · ' +
-          (obs.quality_grade || 'ungraded') + (obs.obscured ? ' · approximate location' : '') + ' ';
+        popup.className = 'obspop';
+        const line = document.createElement('div');
+        line.textContent = `${obs.observed_on || 'Date unknown'} · ${km < 10 ? km.toFixed(1) : Math.round(km)} km away` +
+          (obs.obscured ? ' · location hidden by iNaturalist' : '');
+        popup.append(line);
+        const links = document.createElement('div');
+        if (!obs.obscured){
+          const go = document.createElement('a');
+          go.href = directionsURL(olat, olng);
+          go.target = '_blank'; go.rel = 'noopener'; go.textContent = 'Directions';
+          links.append(go, ' · ');
+        }
         const link = document.createElement('a');
         link.href = 'https://www.inaturalist.org/observations/' + Number(obs.id);
         link.target = '_blank'; link.rel = 'noopener'; link.textContent = 'View observation';
-        popup.append(link);
+        links.append(link);
+        popup.append(links);
         L.circleMarker([coords[1],coords[0]],{radius:6,color:'#fff',weight:2,fillColor:'#ff3b30',fillOpacity:1})
           .bindPopup(popup).addTo(map);
       }
       if (data.results.length) cursor = data.results[data.results.length-1].id;
-      count.textContent = mapped + ' mapped · ' + loaded + ' of ' + total + ' observations loaded';
+      count.textContent = mapped + ' mapped · ' + loaded + ' of ' + total + ' observations loaded' +
+        (nearest != null ? ` · nearest ${nearest < 10 ? nearest.toFixed(1) : Math.round(nearest)} km away` : '');
       more.hidden = data.results.length < 100 || loaded >= total;
       more.textContent = 'Load more observations';
       note.textContent = total ? 'Research-grade observations from all dates; no flower or fruit tag required. Public locations may be approximate. Sightings do not confirm seed readiness or that the plant is still present.'
