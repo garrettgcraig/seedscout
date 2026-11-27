@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  SeedFinder privacy manifest.
+  No tracking and no tracking domains. Records, photos and favorites stay on the
+  device; nothing is sent to a SeedFinder server (there is none).
+  Required-reason APIs: UserDefaults only, for the app's own settings
+  (favorites, last searched place, the dismissed safety banner) - reason CA92.1.
+  Before App Store submission, review NSPrivacyCollectedDataTypes against the
+  live network calls: coordinates go to iNaturalist (observation maps), Apple
+  MapKit (place search, basemap) and open-meteo (elevation on the web only).
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
